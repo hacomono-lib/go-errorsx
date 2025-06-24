@@ -324,7 +324,7 @@ func deepNestedCause(depth int) error {
 	}
 	cause := deepNestedCause(depth - 1)
 	return errorsx.New(fmt.Sprintf("nested.%d", depth)).
-		WithReason(fmt.Sprintf("Depth %d", depth)).
+		WithReason("Depth %d", depth).
 		WithCause(cause)
 }
 
