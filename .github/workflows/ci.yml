@@ -46,13 +46,12 @@ jobs:
     - name: Run tests
       run: go test -v -race -coverprofile=coverage.out ./...
 
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v4
-      with:
-        file: ./coverage.out
-        flags: unittests
-        name: codecov-umbrella
-        fail_ci_if_error: false
+    - name: Display coverage
+      run: |
+        if [ -f coverage.out ]; then
+          go tool cover -func=coverage.out
+          echo "Coverage report generated: coverage.out"
+        fi
 
   lint:
     runs-on: ubuntu-latest
@@ -80,11 +79,13 @@ jobs:
         echo "GOCACHE=$HOME/.cache/go-build" >> $GITHUB_ENV
         echo "GOMODCACHE=$HOME/go/pkg/mod" >> $GITHUB_ENV
 
-    - name: golangci-lint
-      uses: golangci/golangci-lint-action@v6
-      with:
-        version: latest
-        args: --timeout=5m
+    - name: Install golangci-lint
+      run: |
+        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.61.0
+        echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+
+    - name: Run golangci-lint
+      run: golangci-lint run --timeout=5m
 
   security:
     runs-on: ubuntu-latest
