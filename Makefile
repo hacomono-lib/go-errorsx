@@ -69,8 +69,31 @@ ci: fmt vet lint test-race test-cover
 ## install-tools: Install development tools
 install-tools:
 	@echo "Installing development tools..."
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell go env GOPATH)/bin
+	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+	go install github.com/securego/gosec/v2/cmd/gosec@latest
 	@echo "Development tools installed successfully"
+
+## docker-dev: Start development container
+docker-dev:
+	docker-compose up -d dev
+	docker-compose exec dev bash
+
+## docker-test: Run tests in container
+docker-test:
+	docker-compose run --rm test
+
+## docker-lint: Run linter in container
+docker-lint:
+	docker-compose run --rm lint
+
+## docker-security: Run security scan in container
+docker-security:
+	docker-compose run --rm security
+
+## docker-clean: Clean up Docker resources
+docker-clean:
+	docker-compose down -v
+	docker system prune -f
 
 ## check: Run all checks (formatting, linting, testing)
 check: fmt vet lint test-cover

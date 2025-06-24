@@ -1,0 +1,32 @@
+# Git files
+.git
+.gitignore
+
+# Documentation
+README.md
+*.md
+
+# CI/CD
+.github/
+.codecov.yml
+
+# Development files
+.vscode/
+.devcontainer/
+
+# Test artifacts
+coverage.out
+coverage.html
+results.sarif
+
+# Dependencies
+vendor/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+.cache/

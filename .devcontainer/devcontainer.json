@@ -1,0 +1,52 @@
+{
+  "name": "Go ErrorsX Development",
+  "dockerComposeFile": "../docker-compose.yml",
+  "service": "dev",
+  "workspaceFolder": "/workspace",
+  "shutdownAction": "stopCompose",
+  
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "golang.go",
+        "ms-vscode.vscode-json",
+        "redhat.vscode-yaml",
+        "ms-vscode.makefile-tools",
+        "github.vscode-github-actions",
+        "github.copilot",
+        "github.copilot-chat"
+      ],
+      "settings": {
+        "go.useLanguageServer": true,
+        "go.gopath": "/go",
+        "go.goroot": "/usr/local/go",
+        "go.toolsGopath": "/go/bin",
+        "go.lintTool": "golangci-lint",
+        "go.lintFlags": ["--fast"],
+        "go.testFlags": ["-v", "-race"],
+        "go.coverOnSave": true,
+        "go.coverageDecorator": {
+          "type": "gutter"
+        },
+        "go.testTimeout": "30s",
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+          "source.organizeImports": "explicit"
+        }
+      }
+    }
+  },
+  
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  
+  "postCreateCommand": "make install-tools",
+  
+  "remoteUser": "root",
+  
+  "mounts": [
+    "source=${localWorkspaceFolder}/.git,target=/workspace/.git,type=bind,consistency=cached"
+  ]
+}

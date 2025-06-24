@@ -390,6 +390,72 @@ validationErr := errorsx.NewValidationError("form.invalid").
 
 **Note**: `WithCause` and `WithCallerStack` are mutually exclusive. `WithCause` automatically captures the stack trace, so using both together is not necessary and the second one will be ignored.
 
+## Development
+
+### Local Development
+
+```bash
+# Install development tools
+make install-tools
+
+# Run tests
+make test
+
+# Run tests with coverage
+make test-cover
+
+# Run linter
+make lint
+
+# Run all checks
+make ci
+```
+
+### Container Development
+
+For developers who prefer containerized development or want to avoid polluting their local environment:
+
+#### Using Docker Compose
+
+```bash
+# Start development environment
+make docker-dev
+
+# Run tests in container
+make docker-test
+
+# Run linter in container
+make docker-lint
+
+# Run security scan in container
+make docker-security
+
+# Clean up containers
+make docker-clean
+```
+
+#### Using VS Code Dev Containers
+
+1. Install the "Dev Containers" extension in VS Code
+2. Open the project in VS Code
+3. Press `Ctrl+Shift+P` (or `Cmd+Shift+P` on Mac)
+4. Select "Dev Containers: Reopen in Container"
+
+The development container includes:
+- Go 1.23 with all development tools
+- golangci-lint for code quality
+- gosec for security scanning
+- Git and GitHub CLI
+- Optimized VS Code settings for Go development
+
+### Performance Optimizations
+
+The CI/CD pipeline includes several performance optimizations:
+- **Multi-level caching**: Go modules, build cache, and tool binaries
+- **Parallel execution**: Tests run concurrently across multiple Go versions
+- **Incremental builds**: Only rebuild when necessary
+- **Container layer caching**: Optimized Docker builds
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.

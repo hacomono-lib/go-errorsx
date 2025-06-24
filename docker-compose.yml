@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  # Development environment
+  dev:
+    build:
+      context: .
+      target: development
+    volumes:
+      - .:/workspace
+      - go-mod-cache:/go/pkg/mod
+      - go-build-cache:/root/.cache/go-build
+    working_dir: /workspace
+    environment:
+      - CGO_ENABLED=0
+      - GOOS=linux
+      - GOARCH=amd64
+    command: bash
+    stdin_open: true
+    tty: true
+
+  # Test environment
+  test:
+    build:
+      context: .
+      target: development
+    volumes:
+      - .:/workspace
+      - go-mod-cache:/go/pkg/mod
+      - go-build-cache:/root/.cache/go-build
+    working_dir: /workspace
+    command: make test-cover
+
+  # Lint environment
+  lint:
+    build:
+      context: .
+      target: development
+    volumes:
+      - .:/workspace
+      - go-mod-cache:/go/pkg/mod
+      - go-build-cache:/root/.cache/go-build
+    working_dir: /workspace
+    command: make lint
+
+  # Security scan environment
+  security:
+    build:
+      context: .
+      target: development
+    volumes:
+      - .:/workspace
+      - go-mod-cache:/go/pkg/mod
+      - go-build-cache:/root/.cache/go-build
+    working_dir: /workspace
+    command: gosec ./...
+
+volumes:
+  go-mod-cache:
+  go-build-cache:
