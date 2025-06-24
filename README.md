@@ -3,6 +3,7 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/hacomono-lib/go-errorsx.svg)](https://pkg.go.dev/github.com/hacomono-lib/go-errorsx)
 [![Go Report Card](https://goreportcard.com/badge/github.com/hacomono-lib/go-errorsx)](https://goreportcard.com/report/github.com/hacomono-lib/go-errorsx)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![CI](https://github.com/hacomono-lib/go-errorsx/workflows/CI/badge.svg)](https://github.com/hacomono-lib/go-errorsx/actions/workflows/ci.yml)
 
 A comprehensive error handling library for Go that provides structured, chainable errors with stack traces, error types, and enhanced context.
 

@@ -1,0 +1,219 @@
+run:
+  timeout: 5m
+  tests: true
+  modules-download-mode: readonly
+
+linters:
+  enable:
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - typecheck
+    - unused
+    - asasalint
+    - asciicheck
+    - bidichk
+    - bodyclose
+    - containedctx
+    - contextcheck
+    - cyclop
+    - decorder
+    - dogsled
+    - dupl
+    - durationcheck
+    - errchkjson
+    - errname
+    - errorlint
+    - execinquery
+    - exhaustive
+    - exportloopref
+    - forbidigo
+    - forcetypeassert
+    - funlen
+    - gci
+    - gochecknoglobals
+    - gochecknoinits
+    - gocognit
+    - goconst
+    - gocritic
+    - gocyclo
+    - godot
+    - godox
+    - goerr113
+    - gofmt
+    - gofumpt
+    - goheader
+    - goimports
+    - gomnd
+    - gomoddirectives
+    - gomodguard
+    - goprintffuncname
+    - gosec
+    - grouper
+    - importas
+    - interfacebloat
+    - ireturn
+    - lll
+    - loggercheck
+    - maintidx
+    - makezero
+    - misspell
+    - nakedret
+    - nestif
+    - nilerr
+    - nilnil
+    - nlreturn
+    - noctx
+    - nolintlint
+    - nonamedreturns
+    - nosprintfhostport
+    - predeclared
+    - promlinter
+    - reassign
+    - revive
+    - rowserrcheck
+    - sqlclosecheck
+    - stylecheck
+    - tagliatelle
+    - tenv
+    - testableexamples
+    - testpackage
+    - thelper
+    - tparallel
+    - unconvert
+    - unparam
+    - usestdlibvars
+    - varnamelen
+    - wastedassign
+    - whitespace
+    - wrapcheck
+    - wsl
+
+linters-settings:
+  cyclop:
+    max-complexity: 15
+  
+  funlen:
+    lines: 100
+    statements: 50
+  
+  gocognit:
+    min-complexity: 15
+  
+  gocyclo:
+    min-complexity: 15
+  
+  godot:
+    scope: declarations
+    exclude:
+      - "^fixme:"
+      - "^todo:"
+  
+  gomnd:
+    ignored-functions:
+      - args.Error
+      - flag.Arg
+      - flag.Duration
+      - flag.Float64
+      - flag.Int
+      - flag.Int64
+      - flag.String
+      - flag.Uint
+      - flag.Uint64
+      - fmt.Errorf
+      - fmt.Print
+      - fmt.Printf
+      - fmt.Println
+      - fmt.Sprintf
+      - fmt.Sprint
+      - log.Print
+      - log.Printf
+      - log.Println
+      - strconv.FormatFloat
+      - strconv.FormatInt
+      - strconv.FormatUint
+      - strconv.ParseFloat
+      - strconv.ParseInt
+      - strconv.ParseUint
+  
+  gosec:
+    excludes:
+      - G204 # Subprocess launched with variable
+  
+  lll:
+    line-length: 120
+  
+  misspell:
+    locale: US
+  
+  nakedret:
+    max-func-lines: 30
+  
+  varnamelen:
+    min-name-length: 2
+    ignore-type-assert-ok: true
+    ignore-map-index-ok: true
+    ignore-chan-recv-ok: true
+    ignore-names:
+      - err
+      - ok
+      - i
+      - j
+      - k
+      - v
+      - id
+      - ip
+      - db
+      - tx
+      - up
+      - to
+      - in
+      - ch
+      - fn
+      - fs
+      - wg
+      - mu
+      - fd
+      - st
+      - sb
+      - b
+      - e
+      - n
+      - s
+      - t
+
+issues:
+  exclude-rules:
+    # Exclude some linters from running on tests files.
+    - path: _test\.go
+      linters:
+        - gocyclo
+        - errcheck
+        - dupl
+        - gosec
+        - funlen
+        - gocognit
+        - cyclop
+        - maintidx
+        - wrapcheck
+        - varnamelen
+        - goerr113
+        - testpackage
+
+    # Exclude known linters from partially hard-to-fix issues
+    - linters:
+        - gosimple
+      text: "S1002:"
+    
+    - linters:
+        - revive
+      text: "package-comments:"
+    
+    - linters:
+        - gocritic
+      text: "unnecessaryDefer:"
+
+  max-issues-per-linter: 0
+  max-same-issues: 0
