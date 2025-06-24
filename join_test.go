@@ -4,9 +4,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stretchr/testify/suite"
-
 	"github.com/hacomono-lib/go-errorsx"
+	"github.com/stretchr/testify/suite"
 )
 
 type JoinTestSuite struct {

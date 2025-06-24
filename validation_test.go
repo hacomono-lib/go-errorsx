@@ -6,10 +6,9 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/hacomono-lib/go-errorsx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
-
-	"github.com/hacomono-lib/go-errorsx"
 )
 
 type ValidationErrorTestSuite struct {

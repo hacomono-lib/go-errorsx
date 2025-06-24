@@ -32,6 +32,7 @@ func New(id string, opts ...Option) *Error {
 	for _, opt := range opts {
 		opt(e)
 	}
+
 	return e
 }
 
@@ -44,6 +45,7 @@ func (e *Error) ID() string {
 func (e *Error) WithReason(reason string, params ...any) *Error {
 	clone := *e
 	clone.msg = fmt.Sprintf(reason, params...)
+
 	return &clone
 }
 
@@ -69,6 +71,7 @@ func (e *Error) Is(target error) bool {
 	if !ok {
 		return errors.Is(e.cause, target)
 	}
+
 	return e.id == t.id
 }
 
@@ -76,6 +79,7 @@ func (e *Error) Is(target error) bool {
 func (e *Error) WithMessage(data any) *Error {
 	clone := *e
 	clone.messageData = data
+
 	return &clone
 }
 
@@ -103,6 +107,7 @@ func Message[T any](err error) (T, bool) {
 			return data, true
 		}
 	}
+
 	return zero, false
 }
 
@@ -112,5 +117,6 @@ func MessageOr[T any](err error, fallback T) T {
 	if data, ok := Message[T](err); ok {
 		return data
 	}
+
 	return fallback
 }

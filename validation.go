@@ -10,27 +10,28 @@ const (
 	MessageKeyValidationSummary = "validation.summary"
 )
 
-// SummaryTranslator is a function type that translates a summary message key and its parameters into a localized message.
-// fieldErrors is passed by reference to access the number of errors.
+// SummaryTranslator is a function type that translates a summary message key and its
+// parameters into a localized message. fieldErrors is passed by reference to access the number of errors.
 type SummaryTranslator func(fieldErrors []FieldError, key string, params ...any) string
 
-// FieldTranslator is a function type that translates a field error message key and its parameters into a localized message.
+// FieldTranslator is a function type that translates a field error message key and its
+// parameters into a localized message.
 type FieldTranslator func(key string, params ...any) string
 
 // DefaultSummaryTranslator returns the message key as is.
-func DefaultSummaryTranslator(fieldErrors []FieldError, key string, params ...any) string {
+func DefaultSummaryTranslator(_ []FieldError, key string, _ ...any) string {
 	return key
 }
 
 // DefaultFieldTranslator returns the message key as is.
-func DefaultFieldTranslator(key string, params ...any) string {
+func DefaultFieldTranslator(key string, _ ...any) string {
 	return key
 }
 
-// FieldError represents "individual error information that occurred for a specific field".
+// FieldError represents individual error information that occurred for a specific field.
 // - Field: Input field name on the form (e.g., "email", "password", etc.)
 // - MessageKey: Message key (e.g., "validation.required", "validation.email", etc.)
-// - MessageParams: Parameters for i18n or embedded values. Use as needed
+// - MessageParams: Parameters for i18n or embedded values. Use as needed.
 type FieldError struct {
 	Field         string `json:"field"`          // Form field name
 	MessageKey    string `json:"message_key"`    // Message key

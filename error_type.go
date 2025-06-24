@@ -15,6 +15,7 @@ const (
 func (e *Error) WithType(typ ErrorType) *Error {
 	clone := *e
 	clone.errType = typ
+
 	return &clone
 }
 
@@ -28,6 +29,7 @@ func Type(err error) ErrorType {
 	if e, ok := err.(*Error); ok {
 		return e.errType
 	}
+
 	return TypeUnknown
 }
 
@@ -70,6 +72,7 @@ func FilterByType(err error, typ ErrorType) []*Error {
 	}
 
 	walk(err)
+
 	return result
 }
 

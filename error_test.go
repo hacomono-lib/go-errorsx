@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/hacomono-lib/go-errorsx"
-
 	"github.com/stretchr/testify/suite"
 )
 
@@ -609,7 +608,6 @@ func (m LocalizableMessage) Localize(locale string) string {
 }
 
 func (s *ErrorSuite) TestGenericMessageWithInterface() {
-
 	localizableData := LocalizableMessage{
 		Key:    "error.user.not_found",
 		Params: map[string]string{"userId": "123"},
