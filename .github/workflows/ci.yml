@@ -81,7 +81,7 @@ jobs:
         echo "GOMODCACHE=$HOME/go/pkg/mod" >> $GITHUB_ENV
 
     - name: golangci-lint
-      uses: golangci/golangci-lint-action@v6
+      uses: golangci/golangci-lint-action@v8
       with:
         version: latest
         args: --timeout=5m
