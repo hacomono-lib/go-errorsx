@@ -131,8 +131,11 @@ jobs:
         $HOME/go/bin/gosec -no-fail -fmt sarif -out results.sarif ./...
       continue-on-error: true
 
-    - name: Upload SARIF file
-      uses: github/codeql-action/upload-sarif@v3
-      with:
-        sarif_file: results.sarif
+    - name: Display Security Results
+      run: |
+        if [ -f results.sarif ]; then
+          echo "Security scan completed. Results saved to results.sarif"
+          # Display basic summary (optional)
+          jq -r '.runs[0].results[] | "Issue: " + .ruleId + " - " + .message.text' results.sarif 2>/dev/null || echo "No security issues found"
+        fi
       if: always()

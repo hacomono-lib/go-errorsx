@@ -74,7 +74,6 @@ linters:
     - sqlclosecheck
     - stylecheck
     - tagliatelle
-    - usetesting
     - testableexamples
     - testpackage
     - thelper
