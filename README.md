@@ -128,10 +128,26 @@ Handle form validation with field-level error details:
 
 ```go
 validationErr := errorsx.NewValidationError("form.validation.failed").
-    WithHTTPStatus(400)
+    WithHTTPStatus(400).
+    WithMessage("Form validation failed")
 
-validationErr.AddFieldError("email", "validation.required")
-validationErr.AddFieldError("password", "validation.min_length", 8)
+// Simple string messages
+validationErr.AddFieldError("email", "required", "Email is required")
+
+// Complex message data
+validationErr.AddFieldError("password", "min_length", map[string]any{
+    "min":     8,
+    "current": 3,
+})
+
+// Translation data
+validationErr.AddFieldError("age", "range", struct {
+    Key    string `json:"key"`
+    Params map[string]any `json:"params"`
+}{
+    Key:    "validation.age.range",
+    Params: map[string]any{"min": 18, "max": 65},
+})
 
 // JSON output will include structured field errors
 jsonData, _ := json.Marshal(validationErr)
@@ -233,11 +249,17 @@ fmt.Println(string(jsonData))
 
 ```go
 validationErr := errorsx.NewValidationError("form.validation.failed").
-    WithHTTPStatus(400)
+    WithHTTPStatus(400).
+    WithMessage("Form validation failed")
 
-validationErr.AddFieldError("email", "validation.required")
-validationErr.AddFieldError("password", "validation.min_length", 8)
-validationErr.AddFieldError("age", "validation.range", 18, 65)
+validationErr.AddFieldError("email", "required", "Email is required")
+validationErr.AddFieldError("password", "min_length", map[string]any{
+    "min": 8, "current": 3,
+})
+validationErr.AddFieldError("age", "range", struct {
+    Min int `json:"min"`
+    Max int `json:"max"`
+}{Min: 18, Max: 65})
 
 jsonData, _ := json.Marshal(validationErr)
 fmt.Println(string(jsonData))
@@ -248,26 +270,32 @@ fmt.Println(string(jsonData))
 {
   "id": "form.validation.failed",
   "type": "errorsx.validation",
-  "message_data": "validation.summary",
-  "message": "validation.summary",
+  "message_data": "Form validation failed",
+  "message": "Validation failed with 3 error(s)",
   "field_errors": [
     {
       "field": "email",
-      "message_key": "validation.required",
-      "message_params": [],
-      "message": "validation.required"
+      "code": "required",
+      "message": "Email is required",
+      "translated_message": "Email is required"
     },
     {
       "field": "password",
-      "message_key": "validation.min_length",
-      "message_params": [8],
-      "message": "validation.min_length"
+      "code": "min_length",
+      "message": {
+        "min": 8,
+        "current": 3
+      },
+      "translated_message": "Password must be at least 8 characters"
     },
     {
       "field": "age",
-      "message_key": "validation.range",
-      "message_params": [18, 65],
-      "message": "validation.range"
+      "code": "range",
+      "message": {
+        "min": 18,
+        "max": 65
+      },
+      "translated_message": "Age must be between 18 and 65"
     }
   ]
 }
@@ -350,17 +378,61 @@ if errors.Is(wrappedErr, originalErr) {
 }
 ```
 
-### Validation with Custom Translators
+### Validation with Translation Support
+
+The library provides built-in translation support for both summary messages and individual field errors:
 
 ```go
+// Custom translators
+summaryTranslator := func(fieldErrors []errorsx.FieldError, messageData any) string {
+    count := len(fieldErrors)
+    if count == 1 {
+        return "There is 1 validation error"
+    }
+    return fmt.Sprintf("There are %d validation errors", count)
+}
+
+fieldTranslator := func(field, code string, message any) string {
+    switch code {
+    case "required":
+        return fmt.Sprintf("%s is required", strings.Title(field))
+    case "min_length":
+        if data, ok := message.(map[string]any); ok {
+            if min, ok := data["min"].(int); ok {
+                return fmt.Sprintf("%s must be at least %d characters", strings.Title(field), min)
+            }
+        }
+    }
+    return fmt.Sprintf("%v", message)
+}
+
+// Apply translators
 validationErr := errorsx.NewValidationError("form.invalid").
-    WithSummaryTranslator(func(fieldErrors []errorsx.FieldError, key string, params ...any) string {
-        return fmt.Sprintf("Form has %d validation errors", len(fieldErrors))
-    }).
-    WithFieldTranslator(func(key string, params ...any) string {
-        // Custom field error translation
-        return translateMessage(key, params...)
-    })
+    WithSummaryTranslator(summaryTranslator).
+    WithFieldTranslator(fieldTranslator).
+    WithMessage("Form validation failed")
+
+// Add field errors - translators will be applied automatically
+validationErr.AddFieldError("email", "required", nil)
+validationErr.AddFieldError("password", "min_length", map[string]any{"min": 8})
+
+// Error() and JSON output will use translated messages
+fmt.Println(validationErr.Error())
+// Output: form.invalid: Email: Email is required; Password: Password must be at least 8 characters
+```
+
+#### Translation with i18n Libraries
+
+```go
+// Example with go-i18n or similar
+fieldTranslator := func(field, code string, message any) string {
+    key := fmt.Sprintf("validation.%s.%s", field, code)
+    
+    // Use your i18n library
+    return i18n.Translate(key, message)
+}
+
+validationErr.WithFieldTranslator(fieldTranslator)
 ```
 
 ## API Reference

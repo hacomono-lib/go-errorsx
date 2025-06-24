@@ -76,7 +76,7 @@ func (s *JoinTestSuite) TestJoinWithMixedErrorTypes_IsAndAs() {
 	err1 := errorsx.New("custom error 1")
 	stdErr := errors.New("standard error")
 	valErr := errorsx.NewValidationError("validation.failed")
-	valErr.AddFieldError("email", "validation.required")
+	valErr.AddFieldError("email", "required", "Email is required")
 
 	joined := errorsx.Join(err1, stdErr, valErr)
 
