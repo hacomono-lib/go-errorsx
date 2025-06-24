@@ -1,0 +1,137 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go-version: [1.21.x, 1.22.x, 1.23.x]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ matrix.go-version }}
+
+    - name: Cache Go modules and build cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-${{ matrix.go-version }}-
+          ${{ runner.os }}-go-
+        
+    - name: Set Go environment variables
+      run: |
+        echo "GOCACHE=$HOME/.cache/go-build" >> $GITHUB_ENV
+        echo "GOMODCACHE=$HOME/go/pkg/mod" >> $GITHUB_ENV
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Verify dependencies
+      run: go mod verify
+
+    - name: Run tests
+      run: go test -v -race -coverprofile=coverage.out ./...
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./coverage.out
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: 1.23.x
+
+    - name: Cache Go modules and build cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-1.23.x-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-1.23.x-
+          ${{ runner.os }}-go-
+        
+    - name: Set Go environment variables
+      run: |
+        echo "GOCACHE=$HOME/.cache/go-build" >> $GITHUB_ENV
+        echo "GOMODCACHE=$HOME/go/pkg/mod" >> $GITHUB_ENV
+
+    - name: golangci-lint
+      uses: golangci/golangci-lint-action@v6
+      with:
+        version: latest
+        args: --timeout=5m
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: 1.23.x
+
+    - name: Cache Go modules and build cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-1.23.x-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-1.23.x-
+          ${{ runner.os }}-go-
+        
+    - name: Set Go environment variables
+      run: |
+        echo "GOCACHE=$HOME/.cache/go-build" >> $GITHUB_ENV
+        echo "GOMODCACHE=$HOME/go/pkg/mod" >> $GITHUB_ENV
+        echo "GOBIN=$HOME/go/bin" >> $GITHUB_ENV
+
+    - name: Cache Gosec binary
+      uses: actions/cache@v4
+      with:
+        path: ~/go/bin
+        key: ${{ runner.os }}-gosec-v2-latest
+
+    - name: Install Gosec
+      run: |
+        if [ ! -f "$HOME/go/bin/gosec" ]; then
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
+        fi
+
+    - name: Run Gosec Security Scanner
+      run: |
+        $HOME/go/bin/gosec -no-fail -fmt sarif -out results.sarif ./...
+      continue-on-error: true
+
+    - name: Upload SARIF file
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: results.sarif
+      if: always()
