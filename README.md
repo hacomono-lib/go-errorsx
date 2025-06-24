@@ -87,6 +87,40 @@ if errorsx.HasType(err, TypeBusiness) {
 businessErrors := errorsx.FilterByType(err, TypeBusiness)
 ```
 
+#### Design Philosophy: ID vs Type
+
+The library follows a clear separation of concerns:
+
+- **Error ID**: Represents the unique identity of an error (e.g., `"user.not.found"`, `"payment.failed"`)
+- **Error Type**: Represents the category or classification for grouping errors (e.g., `"validation"`, `"business"`, `"infrastructure"`)
+
+This design allows:
+
+```go
+// Same logical error in different contexts
+userErr := errorsx.New("user.not.found").WithType(TypeBusiness)
+adminErr := errorsx.New("user.not.found").WithType(TypeSecurity)
+
+// They are considered the same error for handling purposes
+if errors.Is(userErr, adminErr) {
+    // This returns true - same ID means same logical error
+    // regardless of classification
+}
+
+// But can be handled differently based on type
+if errorsx.HasType(userErr, TypeBusiness) {
+    // Handle as business logic error
+}
+if errorsx.HasType(adminErr, TypeSecurity) {
+    // Handle as security-related error
+}
+```
+
+**Key Benefits:**
+- **Flexible Error Handling**: The same logical error can be handled consistently across different contexts
+- **Clear Separation**: Identity (what happened) vs Classification (how to categorize it)
+- **Reusable Error Definitions**: Error IDs can be reused across different layers or modules
+
 ### Validation Errors
 
 Handle form validation with field-level error details:
