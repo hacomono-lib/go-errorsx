@@ -80,23 +80,65 @@ func (v *ValidationError) WithMessage(data any) *ValidationError {
 	return v
 }
 
-// WithSummaryTranslator sets a custom translator for the summary message.
+// WithSummaryTranslator sets a custom translator for generating the overall
+// validation error summary message. This is useful for internationalization
+// or custom error message formatting.
+//
+// Example:
+//
+//	customSummary := func(fieldErrors []FieldError, messageData any) string {
+//		return fmt.Sprintf("Validation failed for %d fields", len(fieldErrors))
+//	}
+//	verr.WithSummaryTranslator(customSummary)
 func (v *ValidationError) WithSummaryTranslator(t SummaryTranslator) *ValidationError {
 	v.summaryTranslator = t
 	return v
 }
 
-// WithFieldTranslator sets a custom translator for field error messages.
+// WithFieldTranslator sets a custom translator for individual field error messages.
+// This enables localization and custom formatting of field-specific error messages.
+//
+// Example:
+//
+//	customFieldTranslator := func(field, code string, message any) string {
+//		switch code {
+//		case "required":
+//			return fmt.Sprintf("The %s field is required", field)
+//		default:
+//			return fmt.Sprintf("%v", message)
+//		}
+//	}
+//	verr.WithFieldTranslator(customFieldTranslator)
 func (v *ValidationError) WithFieldTranslator(t FieldTranslator) *ValidationError {
 	v.fieldTranslator = t
 	return v
 }
 
-// AddFieldError adds error information for a specific field.
+// AddFieldError adds validation error information for a specific field.
+// This method accumulates field errors that will be included in the final
+// validation error response.
 //
-//	field: Form field name (e.g., "email")
-//	code: Error code (e.g., "required", "invalid_format")
-//	message: Message data (can be string, object, or any type)
+// Parameters:
+//   - field: The name of the form field (e.g., "email", "password")
+//   - code: Machine-readable error code (e.g., "required", "min_length", "invalid_format")
+//   - message: Human-readable message or structured data for the error
+//
+// Examples:
+//
+//	// Simple string message
+//	verr.AddFieldError("email", "required", "Email address is required")
+//	
+//	// Structured message data for complex validation rules
+//	verr.AddFieldError("password", "min_length", map[string]int{
+//		"min": 8,
+//		"current": 3,
+//	})
+//	
+//	// Internationalization data
+//	verr.AddFieldError("username", "taken", map[string]string{
+//		"en": "Username is already taken",
+//		"ja": "ユーザー名は既に使用されています",
+//	})
 func (v *ValidationError) AddFieldError(field, code string, message any) {
 	v.FieldErrors = append(v.FieldErrors, FieldError{
 		Field:   field,
@@ -105,7 +147,12 @@ func (v *ValidationError) AddFieldError(field, code string, message any) {
 	})
 }
 
-// Error returns a string representation of the validation error.
+// Error implements the standard error interface.
+// It returns a human-readable string that includes the base error message
+// and details about each field error. The format is suitable for logging
+// and debugging purposes.
+//
+// Example output: "validation failed: email: required; password: too short"
 func (v *ValidationError) Error() string {
 	if len(v.FieldErrors) == 0 {
 		return v.BaseError.msg
@@ -120,40 +167,66 @@ func (v *ValidationError) Error() string {
 	return fmt.Sprintf("%s: %s", v.BaseError.msg, strings.Join(parts, "; "))
 }
 
-// Unwrap() is a method for unwrapping errors.
-// This allows BaseError to be traced with errors.Is / errors.As.
+// Unwrap returns the underlying base error, enabling Go's error unwrapping
+// functionality. This allows ValidationError to participate in error chains
+// and be compatible with errors.Is() and errors.As().
+//
+// Example:
+//
+//	if errors.Is(validationErr, someSpecificError) {
+//		// Handle specific error type
+//	}
 func (v *ValidationError) Unwrap() error {
 	return v.BaseError
 }
 
-// HTTPStatus() returns HTTP status for validation errors.
+// HTTPStatus returns the HTTP status code associated with this validation error.
+// This is typically used by web frameworks to set appropriate HTTP response codes.
+// Defaults to 0 if no status was explicitly set.
+//
+// Common validation error status codes:
+//   - 400 Bad Request: General validation failures
+//   - 422 Unprocessable Entity: Semantic validation errors
 func (v *ValidationError) HTTPStatus() int {
 	return v.BaseError.status
 }
 
-// MarshalJSON serializes the validation error to JSON.
-// Returns a structure like:
+// MarshalJSON implements json.Marshaler to provide custom JSON serialization.
+// This method creates a structured JSON representation suitable for API responses,
+// including both the raw message data and translated messages for each field error.
+//
+// The JSON structure includes:
+//   - id: The unique error identifier
+//   - type: The error type (typically "validation")
+//   - message_data: The raw message data from WithMessage()
+//   - message: The translated summary message
+//   - field_errors: Array of field-specific errors with translations
+//
+// Example JSON output:
 //
 //	{
-//	  "id": "validation.failed",
+//	  "id": "user.validation_failed",
 //	  "type": "validation",
-//	  "message_data": "Form validation failed",
+//	  "message_data": "Please fix the following errors",
 //	  "message": "Validation failed with 2 error(s)",
 //	  "field_errors": [
-//	      {
-//	        "field": "email",
-//	        "code": "required",
-//	        "message": "Email is required",
-//	        "translated_message": "Email is required"
-//	      },
-//	      {
-//	        "field": "password",
-//	        "code": "min_length",
-//	        "message": {"min": 8, "current": 3},
-//	        "translated_message": "Password must be at least 8 characters"
-//	      }
+//	    {
+//	      "field": "email",
+//	      "code": "required",
+//	      "message": "Email is required",
+//	      "translated_message": "Email is required"
+//	    },
+//	    {
+//	      "field": "password",
+//	      "code": "min_length",
+//	      "message": {"min": 8, "current": 3},
+//	      "translated_message": "Password must be at least 8 characters"
+//	    }
 //	  ]
 //	}
+//
+// This format enables both programmatic error handling (using codes and structured data)
+// and user-friendly error display (using translated messages).
 func (v *ValidationError) MarshalJSON() ([]byte, error) {
 	type fieldErrorWithTranslation struct {
 		Field             string `json:"field"`
