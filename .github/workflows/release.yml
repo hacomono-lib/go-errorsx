@@ -64,7 +64,18 @@ jobs:
         cat CHANGELOG.md >> $GITHUB_OUTPUT
         echo "EOF" >> $GITHUB_OUTPUT
 
+    - name: Check if release exists
+      id: check_release
+      run: |
+        VERSION=${GITHUB_REF#refs/tags/}
+        RELEASE_EXISTS=$(gh release view $VERSION >/dev/null 2>&1 && echo "true" || echo "false")
+        echo "exists=$RELEASE_EXISTS" >> $GITHUB_OUTPUT
+        echo "Release $VERSION exists: $RELEASE_EXISTS"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
     - name: Create Release
+      if: steps.check_release.outputs.exists == 'false'
       uses: actions/create-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -74,6 +85,11 @@ jobs:
         body: ${{ steps.changelog.outputs.changelog }}
         draft: false
         prerelease: false
+
+    - name: Skip Release Creation
+      if: steps.check_release.outputs.exists == 'true'
+      run: |
+        echo "Release ${{ steps.changelog.outputs.version }} already exists. Skipping creation."
 
     - name: Update pkg.go.dev
       run: |
