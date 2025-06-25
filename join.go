@@ -4,6 +4,21 @@ import (
 	"strings"
 )
 
+// Join returns an error that wraps the given errors.
+// Any nil error values are discarded.
+// Returns nil if all errors are nil.
+// The error formats as the concatenation of the strings obtained
+// by calling the Error method of each element with a separating "; ".
+//
+// This function is compatible with Go's standard errors.Join behavior
+// and supports both errors.Is and errors.As for unwrapping.
+//
+// Example:
+//
+//	err1 := errorsx.New("validation.email")
+//	err2 := errorsx.New("validation.password")
+//	combined := errorsx.Join(err1, err2)
+//	// combined.Error() returns "validation.email; validation.password"
 func Join(errs ...error) error {
 	n := 0
 	for _, err := range errs {
