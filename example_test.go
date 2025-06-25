@@ -9,6 +9,10 @@ import (
 	"github.com/hacomono-lib/go-errorsx"
 )
 
+const (
+	errorCodeRequired = "required"
+)
+
 // Example demonstrates basic error creation and configuration.
 func Example() {
 	err := errorsx.New("user.not_found",
@@ -19,7 +23,7 @@ func Example() {
 	fmt.Println("Error ID:", err.ID())
 	fmt.Println("Error Type:", err.Type())
 	fmt.Println("Error Message:", err.Error())
-	
+
 	// Output:
 	// Error ID: user.not_found
 	// Error Type: errorsx.unknown
@@ -32,7 +36,7 @@ func ExampleError_WithReason() {
 		WithReason("Failed to execute query: %s", "SELECT * FROM users")
 
 	fmt.Println(err.Error())
-	
+
 	// Output:
 	// Failed to execute query: SELECT * FROM users
 }
@@ -59,7 +63,7 @@ func ExampleError_WithMessage() {
 	// Using MessageOr for fallback
 	simpleMsg := errorsx.MessageOr[string](err1, "Unknown error")
 	fmt.Println("Simple message:", simpleMsg)
-	
+
 	// Output:
 	// English: User not found
 	// Japanese: ユーザーが見つかりません
@@ -84,7 +88,7 @@ func ExampleError_WithCause() {
 	// Unwrap to get the original error
 	originalErr := errors.Unwrap(err)
 	fmt.Println("Original error:", originalErr.Error())
-	
+
 	// Output:
 	// Original database error found in chain
 	// Original error: connection timeout
@@ -94,22 +98,22 @@ func ExampleError_WithCause() {
 func ExampleFilterByType() {
 	// Define custom error type
 	const TypeAuthentication errorsx.ErrorType = "myapp.authentication"
-	
+
 	// Create multiple errors of different types
 	validationErr := errorsx.New("email.invalid", errorsx.WithType(errorsx.TypeValidation))
 	authErr := errorsx.New("token.expired", errorsx.WithType(TypeAuthentication))
-	
+
 	// Join errors together
 	combined := errorsx.Join(validationErr, authErr)
 
 	// Filter by validation type
 	validationErrors := errorsx.FilterByType(combined, errorsx.TypeValidation)
 	fmt.Printf("Found %d validation errors\n", len(validationErrors))
-	
+
 	// Check if authentication errors exist
 	hasAuth := errorsx.HasType(combined, TypeAuthentication)
 	fmt.Printf("Has authentication errors: %v\n", hasAuth)
-	
+
 	// Output:
 	// Found 1 validation errors
 	// Has authentication errors: true
@@ -122,7 +126,7 @@ func ExampleNewValidationError() {
 	verr.WithMessage("Please fix the following errors")
 
 	// Add individual field errors
-	verr.AddFieldError("email", "required", "Email is required")
+	verr.AddFieldError("email", errorCodeRequired, "Email is required")
 	verr.AddFieldError("age", "min_value", map[string]int{
 		"min":     18,
 		"current": 16,
@@ -133,10 +137,14 @@ func ExampleNewValidationError() {
 	fmt.Println("Error message:", verr.Error())
 
 	// Demonstrate JSON serialization
-	jsonData, _ := json.MarshalIndent(verr, "", "  ")
+	jsonData, err := json.MarshalIndent(verr, "", "  ")
+	if err != nil {
+		fmt.Printf("JSON marshaling error: %v\n", err)
+		return
+	}
 	fmt.Println("JSON representation:")
 	fmt.Println(string(jsonData))
-	
+
 	// Output:
 	// Error message: user.validation_failed: email: Email is required; age: map[current:16 min:18]; username: Username is already taken
 	// JSON representation:
@@ -176,11 +184,11 @@ func ExampleValidationError_WithFieldTranslator() {
 	// Custom field translator for better error messages
 	fieldTranslator := func(field, code string, message any) string {
 		switch code {
-		case "required":
+		case errorCodeRequired:
 			return fmt.Sprintf("The %s field is required", field)
 		case "min_value":
 			if data, ok := message.(map[string]int); ok {
-				return fmt.Sprintf("The %s must be at least %d (current: %d)", 
+				return fmt.Sprintf("The %s must be at least %d (current: %d)",
 					field, data["min"], data["current"])
 			}
 		case "taken":
@@ -192,12 +200,12 @@ func ExampleValidationError_WithFieldTranslator() {
 	verr := errorsx.NewValidationError("user.validation_failed").
 		WithFieldTranslator(fieldTranslator)
 
-	verr.AddFieldError("email", "required", nil)
+	verr.AddFieldError("email", errorCodeRequired, nil)
 	verr.AddFieldError("age", "min_value", map[string]int{"min": 18, "current": 16})
 	verr.AddFieldError("username", "taken", "john_doe")
 
 	fmt.Println(verr.Error())
-	
+
 	// Output:
 	// user.validation_failed: email: The email field is required; age: The age must be at least 18 (current: 16); username: The username 'john_doe' is already taken
 }
@@ -217,7 +225,7 @@ func ExampleReplaceMessage() {
 	if errors.Is(userErr, originalErr) {
 		fmt.Println("Original error is still in the chain")
 	}
-	
+
 	// Output:
 	// Original error: sql: no rows in result set
 	// User-friendly error: unknown.error
@@ -227,7 +235,7 @@ func ExampleReplaceMessage() {
 // ExampleError_WithCallerStack demonstrates stack trace capture.
 func ExampleError_WithCallerStack() {
 	err := createUserError()
-	
+
 	// Check if error has stack trace
 	if xerr, ok := err.(*errorsx.Error); ok {
 		stacks := xerr.Stacks()
@@ -236,7 +244,7 @@ func ExampleError_WithCallerStack() {
 			fmt.Printf("Stack message: %s\n", stacks[0].Msg)
 		}
 	}
-	
+
 	// Output:
 	// Stack trace captured with 8 frames
 	// Stack message: user.creation_failed
@@ -267,7 +275,7 @@ func ExampleJoin() {
 	// Filter by type
 	validationErrors := errorsx.FilterByType(combined, errorsx.TypeValidation)
 	fmt.Printf("Found %d validation errors\n", len(validationErrors))
-	
+
 	// Output:
 	// Combined error: validation.email; validation.password; database connection failed
 	// Email validation error found
@@ -278,7 +286,6 @@ func ExampleJoin() {
 func Example_webAPI() {
 	// Simulate a web API handler
 	err := handleUserCreation("", "weak")
-	
 	if err != nil {
 		// Handle different error types
 		switch {
@@ -286,7 +293,11 @@ func Example_webAPI() {
 			log.Printf("Validation error: %v", err)
 			// Return HTTP 422 with validation details
 			if verr, ok := err.(*errorsx.ValidationError); ok {
-				jsonData, _ := json.Marshal(verr)
+				jsonData, jsonErr := json.Marshal(verr)
+				if jsonErr != nil {
+					fmt.Printf("JSON marshaling error: %v\n", jsonErr)
+					return
+				}
 				fmt.Printf("HTTP 422 Response: %s\n", jsonData)
 			}
 		case errorsx.HasType(err, errorsx.TypeUnknown):
@@ -298,7 +309,7 @@ func Example_webAPI() {
 			fmt.Println("HTTP 500 Response: Unknown error")
 		}
 	}
-	
+
 	// Output:
 	// HTTP 422 Response: {"id":"user.validation_failed","type":"errorsx.validation","message_data":"Please fix the validation errors","message":"Please fix the validation errors","field_errors":[{"field":"email","code":"required","message":"Email is required","translated_message":"Email is required"},{"field":"password","code":"weak","message":"Password is too weak","translated_message":"Password is too weak"}]}
 }
@@ -310,7 +321,7 @@ func handleUserCreation(email, password string) error {
 		WithMessage("Please fix the validation errors")
 
 	if email == "" {
-		verr.AddFieldError("email", "required", "Email is required")
+		verr.AddFieldError("email", errorCodeRequired, "Email is required")
 	}
 	if password == "weak" {
 		verr.AddFieldError("password", "weak", "Password is too weak")

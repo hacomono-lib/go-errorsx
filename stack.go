@@ -23,7 +23,7 @@ const (
 type StackTrace struct {
 	// Frames contains the raw program counter values for each stack frame.
 	Frames []uintptr
-	
+
 	// Msg is a descriptive message about when this stack trace was captured.
 	Msg string
 }
@@ -65,7 +65,7 @@ type StackTraceCleaner func(frames []string) []string
 //
 //	// Capture stack trace including this function call
 //	err := errorsx.New("something.failed").WithStack(0)
-//	
+//
 //	// Capture stack trace excluding this function call
 //	err := errorsx.New("something.failed").WithStack(1)
 func (e *Error) WithStack(skip int) *Error {
@@ -115,7 +115,7 @@ func (e *Error) WithCallerStack() *Error {
 //		}
 //		return filtered
 //	}
-//	
+//
 //	err := errorsx.New("db.connection_failed").
 //		WithCallerStack().
 //		WithStackTraceCleaner(cleaner)

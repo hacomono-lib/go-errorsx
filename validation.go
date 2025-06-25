@@ -127,13 +127,13 @@ func (v *ValidationError) WithFieldTranslator(t FieldTranslator) *ValidationErro
 //
 //	// Simple string message
 //	verr.AddFieldError("email", "required", "Email address is required")
-//	
+//
 //	// Structured message data for complex validation rules
 //	verr.AddFieldError("password", "min_length", map[string]int{
 //		"min": 8,
 //		"current": 3,
 //	})
-//	
+//
 //	// Internationalization data
 //	verr.AddFieldError("username", "taken", map[string]string{
 //		"en": "Username is already taken",
@@ -152,7 +152,7 @@ func (v *ValidationError) AddFieldError(field, code string, message any) {
 // and details about each field error. The format is suitable for logging
 // and debugging purposes.
 //
-// Example output: "validation failed: email: required; password: too short"
+// Example output: "validation failed: email: required; password: too short".
 func (v *ValidationError) Error() string {
 	if len(v.FieldErrors) == 0 {
 		return v.BaseError.msg

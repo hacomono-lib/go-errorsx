@@ -30,7 +30,6 @@
 //	verr := errorsx.NewValidationError("validation.failed")
 //	verr.AddFieldError("email", "required", "Email is required")
 //	verr.AddFieldError("age", "min_value", map[string]int{"min": 18})
-//
 package errorsx
 
 import (
@@ -212,7 +211,7 @@ func ReplaceMessage(err error, data any) error {
 //	err := errorsx.New("user.not_found").WithMessage(map[string]string{
 //		"en": "User not found",
 //	})
-//	
+//
 //	if msg, ok := errorsx.Message[map[string]string](err); ok {
 //		fmt.Println(msg["en"]) // "User not found"
 //	}

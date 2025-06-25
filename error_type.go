@@ -10,7 +10,7 @@ import "errors"
 //
 //	// Define custom error types
 //	const TypeAuthentication ErrorType = \"myapp.authentication\"
-//	
+//
 //	err := errorsx.New("auth.failed", errorsx.WithType(TypeAuthentication))
 //	if errorsx.HasType(err, TypeAuthentication) {
 //		// Handle authentication errors
@@ -22,10 +22,10 @@ type ErrorType string
 const (
 	// TypeInitialization represents errors that occur during system or component initialization.
 	TypeInitialization ErrorType = "errorsx.initialization"
-	
+
 	// TypeUnknown is the default error type when no specific type is assigned.
 	TypeUnknown ErrorType = "errorsx.unknown"
-	
+
 	// TypeValidation represents errors related to input validation and data constraints.
 	TypeValidation ErrorType = "errorsx.validation"
 )
@@ -74,7 +74,7 @@ func Type(err error) ErrorType {
 //	err1 := errorsx.New("validation.required", errorsx.WithType(errorsx.TypeValidation))
 //	err2 := errorsx.New("validation.format", errorsx.WithType(errorsx.TypeValidation))
 //	combined := errorsx.Join(err1, err2)
-//	
+//
 //	validationErrors := errorsx.FilterByType(combined, errorsx.TypeValidation)
 //	// Returns []*Error containing both validation errors
 //
