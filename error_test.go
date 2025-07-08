@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -630,6 +631,131 @@ func (s *ErrorSuite) TestGenericMessageWithInterface() {
 	} else {
 		s.Fail("Expected successful concrete type extraction")
 	}
+}
+
+func (s *ErrorSuite) TestStackFrames() {
+	// Test with no stack traces
+	err := errorsx.New("test.error")
+	frames := err.StackFrames()
+	s.Require().Nil(frames, "StackFrames should return nil when no stack traces are available")
+
+	// Test with stack traces
+	err = errorsx.New("test.error").WithCallerStack()
+	frames = err.StackFrames()
+	s.Require().NotNil(frames, "StackFrames should return frames when stack traces are available")
+	s.Require().True(len(frames) > 0, "StackFrames should return non-empty slice")
+
+	// Test with multiple stack traces - should return the first (most recent) one
+	baseErr := errorsx.New("base.error").WithCallerStack()
+	wrapperErr := errorsx.New("wrapper.error").WithCause(baseErr)
+
+	frames = wrapperErr.StackFrames()
+	s.Require().NotNil(frames, "StackFrames should return frames for wrapper error")
+	s.Require().True(len(frames) > 0, "StackFrames should return non-empty slice")
+
+	// Verify it returns the most recent stack trace (first one)
+	stacks := wrapperErr.Stacks()
+	s.Require().True(len(stacks) > 0, "Should have stack traces available")
+	s.Require().Equal(stacks[0].Frames, frames, "StackFrames should return the first (most recent) stack trace")
+}
+
+func (s *ErrorSuite) TestStackFramesOriginDetection() {
+	// Test that StackFrames() returns the correct origin for WithCallerStack
+	err := createErrorWithCallerStack()
+	frames := err.StackFrames()
+	s.Require().NotNil(frames, "StackFrames should return frames")
+	s.Require().True(len(frames) > 0, "StackFrames should return non-empty slice")
+
+	// Convert to actual function information
+	framesInfo := runtime.CallersFrames(frames)
+	frame, ok := framesInfo.Next()
+	s.Require().True(ok, "Should have at least one frame")
+
+	// The first frame should point to the createErrorWithCallerStack function
+	s.Require().Contains(frame.Function, "createErrorWithCallerStack",
+		"First frame should point to the function where WithCallerStack was called")
+
+	// Test that StackFrames() returns the correct origin for WithCause
+	baseErr := errors.New("base error")
+	wrapperErr := createErrorWithCause(baseErr)
+	frames = wrapperErr.StackFrames()
+	s.Require().NotNil(frames, "StackFrames should return frames for WithCause")
+	s.Require().True(len(frames) > 0, "StackFrames should return non-empty slice")
+
+	// Convert to actual function information
+	framesInfo = runtime.CallersFrames(frames)
+	frame, ok = framesInfo.Next()
+	s.Require().True(ok, "Should have at least one frame")
+
+	// The first frame should point to the createErrorWithCause function
+	s.Require().Contains(frame.Function, "createErrorWithCause",
+		"First frame should point to the function where WithCause was called")
+}
+
+func (s *ErrorSuite) TestStackFramesWithMultipleWrapping() {
+	// Test that when multiple WithCause calls are made, StackFrames() returns the most recent one
+	baseErr := errors.New("base error")
+	level1Err := createErrorWithCause(baseErr)
+	level2Err := createErrorWithCauseLevel2(level1Err)
+
+	frames := level2Err.StackFrames()
+	s.Require().NotNil(frames, "StackFrames should return frames")
+	s.Require().True(len(frames) > 0, "StackFrames should return non-empty slice")
+
+	// Convert to actual function information
+	framesInfo := runtime.CallersFrames(frames)
+	frame, ok := framesInfo.Next()
+	s.Require().True(ok, "Should have at least one frame")
+
+	// The first frame should point to the most recent WithCause call (level2)
+	s.Require().Contains(frame.Function, "createErrorWithCauseLevel2",
+		"First frame should point to the most recent WithCause call")
+
+	// Verify that we have multiple stack traces but StackFrames returns the first one
+	stacks := level2Err.Stacks()
+	s.Require().True(len(stacks) > 1, "Should have multiple stack traces")
+	s.Require().Equal(stacks[0].Frames, frames, "StackFrames should return the first stack trace")
+}
+
+func (s *ErrorSuite) TestStackFramesConsistencyWithSentry() {
+	// Test that StackFrames() returns consistent format expected by sentry-go
+	err := createErrorWithCallerStack()
+	frames := err.StackFrames()
+
+	// Verify the format matches what sentry-go expects ([]uintptr)
+	s.Require().IsType([]uintptr{}, frames, "StackFrames should return []uintptr")
+
+	// Verify frames can be converted to runtime.Frame
+	framesInfo := runtime.CallersFrames(frames)
+	frameCount := 0
+	for {
+		frame, more := framesInfo.Next()
+		frameCount++
+
+		// Each frame should have valid information
+		s.Require().NotEmpty(frame.Function, "Frame should have function name")
+		s.Require().NotEmpty(frame.File, "Frame should have file name")
+		s.Require().True(frame.Line > 0, "Frame should have valid line number")
+
+		if !more {
+			break
+		}
+	}
+
+	s.Require().True(frameCount > 0, "Should have at least one frame")
+}
+
+// Helper functions for testing
+func createErrorWithCallerStack() *errorsx.Error {
+	return errorsx.New("test.with_caller_stack").WithCallerStack()
+}
+
+func createErrorWithCause(cause error) *errorsx.Error {
+	return errorsx.New("test.with_cause").WithCause(cause)
+}
+
+func createErrorWithCauseLevel2(cause error) *errorsx.Error {
+	return errorsx.New("test.with_cause_level2").WithCause(cause)
 }
 
 func TestErrorSuite(t *testing.T) {

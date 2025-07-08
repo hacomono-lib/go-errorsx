@@ -183,6 +183,20 @@ func (e *Error) Stacks() []StackTrace {
 	return e.stacks
 }
 
+// StackFrames returns the stack frames for sentry-go compatibility.
+// This method is compatible with go-errors/errors and other libraries that
+// expect a StackFrames() []uintptr method for extracting stack traces.
+//
+// If multiple stack traces are available, it returns the most recent one
+// (the first in the slice) as this represents the most direct error location.
+// Returns an empty slice if no stack traces are available.
+func (e *Error) StackFrames() []uintptr {
+	if len(e.stacks) == 0 {
+		return nil
+	}
+	return e.stacks[0].Frames
+}
+
 // RootCause returns the deepest error in the error chain.
 // If an *Error with a cause is found, it follows the cause; otherwise, it unwraps.
 // Returns the last error in the chain (the root cause).
