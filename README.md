@@ -18,6 +18,7 @@ A comprehensive error handling library for Go that provides structured, chainabl
 - **JSON Marshaling**: Seamless JSON serialization for API responses
 - **Error Joining**: Combine multiple errors into a single error
 - **Message Extraction**: Type-safe message data extraction
+- **Retryable Errors**: Mark errors as retryable for resilient operations
 
 ## Installation
 
@@ -378,6 +379,38 @@ if errors.Is(wrappedErr, originalErr) {
 }
 ```
 
+### Retryable Errors
+
+Mark errors as retryable to implement resilient error handling:
+
+```go
+// Create retryable error
+err := errorsx.New("service.unavailable").WithRetryable()
+
+// Or use the convenience constructor
+err := errorsx.NewRetryable("connection.timeout")
+
+// Or use the option
+err := errorsx.New("rate.limit.exceeded", errorsx.WithRetryable())
+
+// Check if error is retryable
+if errorsx.IsRetryable(err) {
+    // Implement retry logic
+    for i := 0; i < maxRetries; i++ {
+        if err := operation(); err == nil {
+            break
+        } else if !errorsx.IsRetryable(err) {
+            return err // Don't retry non-retryable errors
+        }
+        time.Sleep(backoff)
+    }
+}
+
+// Retryable status is preserved in JSON
+jsonData, _ := json.Marshal(err)
+// Output includes: "is_retryable": true
+```
+
 ### Validation with Translation Support
 
 The library provides built-in translation support for both summary messages and individual field errors:
@@ -447,10 +480,12 @@ validationErr.WithFieldTranslator(fieldTranslator)
 ### Key Functions
 
 - `New(id string, opts ...Option) *Error`: Create new error
+- `NewRetryable(id string, opts ...Option) *Error`: Create new retryable error
 - `Join(errs ...error) error`: Combine multiple errors
 - `Message[T](err error) (T, bool)`: Extract typed message data
 - `FilterByType(err error, typ ErrorType) []*Error`: Filter errors by type
 - `HasType(err error, typ ErrorType) bool`: Check if error has specific type
+- `IsRetryable(err error) bool`: Check if error is retryable
 
 ### Options
 
@@ -459,6 +494,7 @@ validationErr.WithFieldTranslator(fieldTranslator)
 - `WithCallerStack()`: Capture stack trace from caller
 - `WithCause(error)`: Set underlying cause and automatically capture stack trace
 - `WithMessage(any)`: Attach message data
+- `WithRetryable()`: Mark error as retryable
 
 **Note**: `WithCause` and `WithCallerStack` are mutually exclusive. `WithCause` automatically captures the stack trace, so using both together is not necessary and the second one will be ignored.
 
