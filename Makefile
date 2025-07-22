@@ -10,6 +10,10 @@ GOMOD=$(GOCMD) mod
 GOFMT=gofmt
 GOLINT=golangci-lint
 
+# Tool versions
+GOLANGCI_LINT_VERSION=v1.61.0
+GOSEC_VERSION=v2.18.2
+
 # Test parameters
 TEST_PACKAGES=./...
 COVERAGE_FILE=coverage.out
@@ -39,7 +43,7 @@ bench:
 	$(GOTEST) -bench=. -benchmem $(TEST_PACKAGES)
 
 ## lint: Run linter
-lint:
+lint: install-tools
 	$(GOLINT) run
 
 ## fmt: Format code
@@ -68,10 +72,20 @@ ci: fmt vet lint test-race test-cover
 
 ## install-tools: Install development tools
 install-tools:
-	@echo "Installing development tools..."
-	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-	go install github.com/securego/gosec/v2/cmd/gosec@latest
-	@echo "Development tools installed successfully"
+	@echo "Checking and installing development tools..."
+	@if ! command -v golangci-lint >/dev/null 2>&1 || [ "$$(golangci-lint version 2>/dev/null | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+')" != "$(GOLANGCI_LINT_VERSION)" ]; then \
+		echo "Installing golangci-lint $(GOLANGCI_LINT_VERSION)..."; \
+		go install github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION); \
+	else \
+		echo "golangci-lint $(GOLANGCI_LINT_VERSION) already installed"; \
+	fi
+	@if ! command -v gosec >/dev/null 2>&1; then \
+		echo "Installing gosec $(GOSEC_VERSION)..."; \
+		go install github.com/securego/gosec/v2/cmd/gosec@$(GOSEC_VERSION); \
+	else \
+		echo "gosec already installed"; \
+	fi
+	@echo "Development tools check completed"
 
 ## docker-dev: Start development container
 docker-dev:

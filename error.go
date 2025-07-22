@@ -75,13 +75,13 @@ type Error struct {
 // to facilitate error categorization and handling.
 func New(id string, opts ...Option) *Error {
 	e := &Error{
-		id:         id,
-		msg:        id,
-		errType:    TypeUnknown,
-		stacks:     nil,
-		isNotFound: false,
+		id:          id,
+		msg:         id,
+		errType:     TypeUnknown,
+		stacks:      nil,
+		isNotFound:  false,
 		isRetryable: false,
-		isStacked:  false,
+		isStacked:   false,
 	}
 	for _, opt := range opts {
 		opt(e)

@@ -10,11 +10,14 @@ RUN apk add --no-cache \
     bash \
     make \
     gcc \
-    musl-dev
+    musl-dev \
+    binutils-gold
 
-# Install development tools
-RUN go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest && \
-    go install github.com/securego/gosec/v2/cmd/gosec@latest
+# Copy Makefile first to leverage layer caching
+COPY Makefile ./
+
+# Install development tools using Makefile
+RUN make install-tools
 
 # Set working directory
 WORKDIR /workspace
