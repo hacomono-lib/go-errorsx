@@ -21,6 +21,7 @@ func (e *Error) MarshalJSON() ([]byte, error) {
 		Type        ErrorType   `json:"type"`
 		Status      int         `json:"status"`
 		MessageData any         `json:"message_data,omitempty"`
+		IsRetryable bool        `json:"is_retryable,omitempty"`
 		Stacks      []jsonStack `json:"stacks,omitempty"`
 		Cause       *jsonCause  `json:"cause,omitempty"`
 	}
@@ -48,6 +49,7 @@ func (e *Error) MarshalJSON() ([]byte, error) {
 		Type:        e.Type(),
 		Status:      e.status,
 		MessageData: e.messageData,
+		IsRetryable: e.isRetryable,
 		Stacks:      stacks,
 		Cause:       cause,
 	})

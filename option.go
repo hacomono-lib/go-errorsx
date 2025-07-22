@@ -72,3 +72,19 @@ func WithNotFound() Option {
 		e.isNotFound = true
 	}
 }
+
+// WithRetryable marks the error as retryable.
+// This indicates that the operation that caused the error can be safely retried,
+// such as temporary network failures or transient service unavailability.
+//
+// Example:
+//
+//	err := errorsx.New("service.unavailable",
+//		errorsx.WithRetryable(),
+//		errorsx.WithHTTPStatus(503),
+//	)
+func WithRetryable() Option {
+	return func(e *Error) {
+		e.isRetryable = true
+	}
+}

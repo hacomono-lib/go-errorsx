@@ -282,6 +282,32 @@ func ExampleJoin() {
 	// Found 2 validation errors
 }
 
+// ExampleError_WithRetryable demonstrates retryable error handling.
+func ExampleError_WithRetryable() {
+	// Create a retryable error for temporary failures
+	err := errorsx.New("service.temporarily_unavailable").
+		WithRetryable().
+		WithHTTPStatus(503).
+		WithMessage("Service temporarily unavailable. Please try again.")
+
+	// Check if error is retryable
+	if errorsx.IsRetryable(err) {
+		fmt.Println("Error is retryable")
+		fmt.Printf("HTTP Status: %d\n", err.HTTPStatus())
+	}
+
+	// Using the convenience constructor
+	timeoutErr := errorsx.NewRetryable("connection.timeout").
+		WithReason("Connection timed out after 30 seconds")
+
+	fmt.Printf("Timeout error is retryable: %v\n", errorsx.IsRetryable(timeoutErr))
+
+	// Output:
+	// Error is retryable
+	// HTTP Status: 503
+	// Timeout error is retryable: true
+}
+
 // Example_webAPI demonstrates a complete web API error handling pattern.
 func Example_webAPI() {
 	// Simulate a web API handler

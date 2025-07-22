@@ -55,6 +55,7 @@ type Error struct {
 	cause             error
 	stackTraceCleaner StackTraceCleaner
 	isNotFound        bool
+	isRetryable       bool
 	isStacked         bool
 }
 
@@ -79,6 +80,7 @@ func New(id string, opts ...Option) *Error {
 		errType:    TypeUnknown,
 		stacks:     nil,
 		isNotFound: false,
+		isRetryable: false,
 		isStacked:  false,
 	}
 	for _, opt := range opts {
