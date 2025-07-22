@@ -87,8 +87,17 @@ jobs:
     - name: Add Go bin to PATH
       run: echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
 
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Install golangci-lint
+      run: |
+        if ! command -v golangci-lint >/dev/null 2>&1; then
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.61.0
+        fi
+
     - name: Run lint
-      run: make lint
+      run: golangci-lint run --timeout=5m
 
   security:
     runs-on: ubuntu-latest
