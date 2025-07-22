@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go-version: [1.21.x, 1.22.x, 1.23.x]
+        go-version: [1.21.x, 1.22.x, 1.23.x, 1.24.x]
 
     steps:
     - uses: actions/checkout@v4
@@ -65,7 +65,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: 1.23.x
+        go-version: 1.24.x
 
     - name: Cache Go modules and build cache
       uses: actions/cache@v4
@@ -73,9 +73,10 @@ jobs:
         path: |
           ~/.cache/go-build
           ~/go/pkg/mod
-        key: ${{ runner.os }}-go-1.23.x-${{ hashFiles('**/go.sum') }}
+          ~/go/bin
+        key: ${{ runner.os }}-go-1.24.x-${{ hashFiles('**/go.sum') }}-lint
         restore-keys: |
-          ${{ runner.os }}-go-1.23.x-
+          ${{ runner.os }}-go-1.24.x-
           ${{ runner.os }}-go-
         
     - name: Set Go environment variables
@@ -83,13 +84,11 @@ jobs:
         echo "GOCACHE=$HOME/.cache/go-build" >> $GITHUB_ENV
         echo "GOMODCACHE=$HOME/go/pkg/mod" >> $GITHUB_ENV
 
-    - name: Install golangci-lint
-      run: |
-        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.61.0
-        echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+    - name: Add Go bin to PATH
+      run: echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
 
-    - name: Run golangci-lint
-      run: golangci-lint run --timeout=5m
+    - name: Run lint
+      run: make lint
 
   security:
     runs-on: ubuntu-latest
@@ -99,7 +98,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: 1.23.x
+        go-version: 1.24.x
 
     - name: Cache Go modules and build cache
       uses: actions/cache@v4
@@ -107,9 +106,9 @@ jobs:
         path: |
           ~/.cache/go-build
           ~/go/pkg/mod
-        key: ${{ runner.os }}-go-1.23.x-${{ hashFiles('**/go.sum') }}
+        key: ${{ runner.os }}-go-1.24.x-${{ hashFiles('**/go.sum') }}
         restore-keys: |
-          ${{ runner.os }}-go-1.23.x-
+          ${{ runner.os }}-go-1.24.x-
           ${{ runner.os }}-go-
         
     - name: Set Go environment variables
