@@ -1,17 +1,9 @@
+version: "2"
 run:
-  timeout: 5m
-  tests: true
   modules-download-mode: readonly
-
+  tests: true
 linters:
   enable:
-    - errcheck
-    - gosimple
-    - govet
-    - ineffassign
-    - staticcheck
-    - typecheck
-    - unused
     - asasalint
     - asciicheck
     - bidichk
@@ -23,6 +15,7 @@ linters:
     - dogsled
     - dupl
     - durationcheck
+    - err113
     - errchkjson
     - errname
     - errorlint
@@ -30,7 +23,6 @@ linters:
     - forbidigo
     - forcetypeassert
     - funlen
-    - gci
     - gochecknoglobals
     - gochecknoinits
     - gocognit
@@ -39,12 +31,7 @@ linters:
     - gocyclo
     - godot
     - godox
-    - err113
-    - gofmt
-    - gofumpt
     - goheader
-    - goimports
-    - mnd
     - gomoddirectives
     - gomodguard
     - goprintffuncname
@@ -58,6 +45,7 @@ linters:
     - maintidx
     - makezero
     - misspell
+    - mnd
     - nakedret
     - nestif
     - nilerr
@@ -72,7 +60,7 @@ linters:
     - revive
     - rowserrcheck
     - sqlclosecheck
-    - stylecheck
+    - staticcheck
     - tagliatelle
     - testableexamples
     - testpackage
@@ -85,202 +73,182 @@ linters:
     - wastedassign
     - whitespace
     - wrapcheck
-
-linters-settings:
-  cyclop:
-    max-complexity: 15
-  
-  funlen:
-    lines: 100
-    statements: 50
-  
-  gocognit:
-    min-complexity: 15
-  
-  gocyclo:
-    min-complexity: 15
-  
-  godot:
-    scope: declarations
-    exclude:
-      - "^fixme:"
-      - "^todo:"
-  
-  mnd:
-    ignored-functions:
-      - args.Error
-      - flag.Arg
-      - flag.Duration
-      - flag.Float64
-      - flag.Int
-      - flag.Int64
-      - flag.String
-      - flag.Uint
-      - flag.Uint64
-      - fmt.Errorf
-      - fmt.Print
-      - fmt.Printf
-      - fmt.Println
-      - fmt.Sprintf
-      - fmt.Sprint
-      - log.Print
-      - log.Printf
-      - log.Println
-      - strconv.FormatFloat
-      - strconv.FormatInt
-      - strconv.FormatUint
-      - strconv.ParseFloat
-      - strconv.ParseInt
-      - strconv.ParseUint
-  
-  gosec:
-    excludes:
-      - G204 # Subprocess launched with variable
-  
-  lll:
-    line-length: 120
-  
-  misspell:
-    locale: US
-  
-  nakedret:
-    max-func-lines: 30
-  
-  varnamelen:
-    min-name-length: 2
-    ignore-type-assert-ok: true
-    ignore-map-index-ok: true
-    ignore-chan-recv-ok: true
-    ignore-names:
-      - err
-      - ok
-      - i
-      - j
-      - k
-      - v
-      - id
-      - ip
-      - db
-      - tx
-      - up
-      - to
-      - in
-      - ch
-      - fn
-      - fs
-      - wg
-      - mu
-      - fd
-      - st
-      - sb
-      - b
-      - e
-      - n
-      - s
-      - t
-
+  settings:
+    cyclop:
+      max-complexity: 15
+    funlen:
+      lines: 100
+      statements: 50
+    gocognit:
+      min-complexity: 15
+    gocyclo:
+      min-complexity: 15
+    godot:
+      scope: declarations
+      exclude:
+        - '^FIXME:'
+        - '^fixme:'
+        - '^TODO:'
+        - '^todo:'
+    gosec:
+      excludes:
+        - G204
+    lll:
+      line-length: 120
+    misspell:
+      locale: US
+    mnd:
+      ignored-functions:
+        - args.Error
+        - flag.Arg
+        - flag.Duration
+        - flag.Float64
+        - flag.Int
+        - flag.Int64
+        - flag.String
+        - flag.Uint
+        - flag.Uint64
+        - fmt.Errorf
+        - fmt.Print
+        - fmt.Printf
+        - fmt.Println
+        - fmt.Sprintf
+        - fmt.Sprint
+        - log.Print
+        - log.Printf
+        - log.Println
+        - strconv.FormatFloat
+        - strconv.FormatInt
+        - strconv.FormatUint
+        - strconv.ParseFloat
+        - strconv.ParseInt
+        - strconv.ParseUint
+    nakedret:
+      max-func-lines: 30
+    varnamelen:
+      min-name-length: 2
+      ignore-names:
+        - err
+        - ok
+        - i
+        - j
+        - k
+        - v
+        - id
+        - ip
+        - db
+        - tx
+        - up
+        - to
+        - in
+        - ch
+        - fn
+        - fs
+        - wg
+        - mu
+        - fd
+        - st
+        - sb
+        - b
+        - e
+        - "n"
+        - s
+        - t
+      ignore-type-assert-ok: true
+      ignore-map-index-ok: true
+      ignore-chan-recv-ok: true
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - linters:
+          - cyclop
+          - dupl
+          - err113
+          - errcheck
+          - funlen
+          - gocognit
+          - gocyclo
+          - gosec
+          - ireturn
+          - maintidx
+          - nlreturn
+          - testpackage
+          - varnamelen
+          - wrapcheck
+          - wsl
+        path: _test\.go
+      - linters:
+          - staticcheck
+        text: 'S1002:'
+      - linters:
+          - revive
+        text: 'package-comments:'
+      - linters:
+          - revive
+        text: 'unused-parameter:'
+      - linters:
+          - gocritic
+        text: 'unnecessaryDefer:'
+      - linters:
+          - err113
+        text: do not compare errors directly
+      - linters:
+          - errorlint
+        text: type assertion on error will fail on wrapped errors
+      - linters:
+          - ireturn
+        text: returns generic interface
+      - linters:
+          - gocognit
+        text: cognitive complexity .* of func `FilterByType`
+      - linters:
+          - tagliatelle
+        text: json
+      - linters:
+          - forbidigo
+        text: use of `fmt.Printf` forbidden
+      - linters:
+          - mnd
+        text: 'Magic number: 3'
+      - linters:
+          - wrapcheck
+        text: error returned from external package is unwrapped.*json.Marshal
+      - linters:
+          - godot
+        path: _test\.go
+      - linters:
+          - revive
+        text: var-declaration
+      - linters:
+          - gocritic
+        text: ifElseChain
+      - linters:
+          - lll
+        path: _test\.go
+      - linters:
+          - staticcheck
+        text: should omit type.*from declaration
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
 issues:
-  exclude-rules:
-    # Exclude some linters from running on tests files.
-    - path: _test\.go
-      linters:
-        - gocyclo
-        - errcheck
-        - dupl
-        - gosec
-        - funlen
-        - gocognit
-        - cyclop
-        - maintidx
-        - wrapcheck
-        - varnamelen
-        - err113
-        - testpackage
-        - nlreturn
-        - wsl
-        - ireturn
-
-    # Exclude known linters from partially hard-to-fix issues
-    - linters:
-        - gosimple
-      text: "S1002:"
-    
-    - linters:
-        - revive
-      text: "package-comments:"
-      
-    - linters:
-        - revive
-      text: "unused-parameter:"
-    
-    - linters:
-        - gocritic
-      text: "unnecessaryDefer:"
-      
-    # Allow direct error comparison for specific cases
-    - linters:
-        - err113
-      text: "do not compare errors directly"
-      
-    # Allow type assertions for *Error type in this error library
-    - linters:
-        - errorlint
-      text: "type assertion on error will fail on wrapped errors"
-      
-    # Allow generic returns for Message functions
-    - linters:
-        - ireturn
-      text: "returns generic interface"
-      
-    # Allow cognitive complexity for FilterByType
-    - linters:
-        - gocognit
-      text: "cognitive complexity .* of func `FilterByType`"
-      
-    # Allow JSON field naming for external API compatibility
-    - linters:
-        - tagliatelle
-      text: "json"
-      
-    # Allow specific forbidden patterns for debugging
-    - linters:
-        - forbidigo
-      text: "use of `fmt.Printf` forbidden"
-      
-    # Allow magic number for runtime.Callers skip
-    - linters:
-        - mnd
-      text: "Magic number: 3"
-      
-    # Allow unwrapped JSON marshal errors
-    - linters:
-        - wrapcheck
-      text: "error returned from external package is unwrapped.*json.Marshal"
-      
-    # Exclude godot for test comments
-    - path: _test\.go
-      linters:
-        - godot
-        
-    # Allow var declaration inference
-    - linters:
-        - revive
-      text: "var-declaration"
-      
-    # Allow gocritic suggestions
-    - linters:
-        - gocritic
-      text: "ifElseChain"
-      
-    # Allow long lines in tests
-    - path: _test\.go
-      linters:
-        - lll
-        
-    # Allow style suggestions
-    - linters:
-        - stylecheck
-      text: "should omit type.*from declaration"
-
   max-issues-per-linter: 0
   max-same-issues: 0
+formatters:
+  enable:
+    - gci
+    - gofmt
+    - gofumpt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
