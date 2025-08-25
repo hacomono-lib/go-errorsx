@@ -277,8 +277,8 @@ func (s *ErrorSuite) TestWithCauseStackCapture() {
 	stack := errorsx.FullStackTrace(causeErr)
 	s.Require().Contains(stack, "TestWithCauseStackCapture")
 	s.Require().Contains(stack, "deepNestedCause")
-	var currentErr error = causeErr
-	var errTexts []string
+	currentErr := causeErr
+	errTexts := []string{}
 	for currentErr != nil {
 		if xerr, ok := currentErr.(*errorsx.Error); ok {
 			errTexts = append(errTexts, xerr.Error())

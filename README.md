@@ -550,7 +550,7 @@ make docker-clean
 4. Select "Dev Containers: Reopen in Container"
 
 The development container includes:
-- Go 1.23 with all development tools
+- Go 1.25 with all development tools
 - golangci-lint for code quality
 - gosec for security scanning
 - Git and GitHub CLI

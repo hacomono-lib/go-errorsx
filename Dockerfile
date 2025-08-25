@@ -1,7 +1,7 @@
 # Multi-stage build for development and production
 
 # Development stage
-FROM golang:1.23-alpine AS development
+FROM golang:1.25-alpine AS development
 
 # Install development tools
 RUN apk add --no-cache \
@@ -35,7 +35,7 @@ COPY . .
 CMD ["bash"]
 
 # Production stage (for building the library)
-FROM golang:1.23-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 WORKDIR /build
 

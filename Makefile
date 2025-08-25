@@ -11,8 +11,8 @@ GOFMT=gofmt
 GOLINT=golangci-lint
 
 # Tool versions
-GOLANGCI_LINT_VERSION=v1.61.0
-GOSEC_VERSION=v2.18.2
+GOLANGCI_LINT_VERSION=v2.4.0
+GOSEC_VERSION=latest
 
 # Test parameters
 TEST_PACKAGES=./...
@@ -73,9 +73,9 @@ ci: fmt vet lint test-race test-cover
 ## install-tools: Install development tools
 install-tools:
 	@echo "Checking and installing development tools..."
-	@if ! command -v golangci-lint >/dev/null 2>&1 || [ "$$(golangci-lint version 2>/dev/null | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+')" != "$(GOLANGCI_LINT_VERSION)" ]; then \
+	@if ! command -v golangci-lint >/dev/null 2>&1 || [ "$$(golangci-lint version 2>/dev/null | sed 's/version /v/' | grep -oE 'v([0-9]+\.[0-9]+\.[0-9]+)')" != "$(GOLANGCI_LINT_VERSION)" ]; then \
 		echo "Installing golangci-lint $(GOLANGCI_LINT_VERSION)..."; \
-		go install github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION); \
+		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin $(GOLANGCI_LINT_VERSION); \
 	else \
 		echo "golangci-lint $(GOLANGCI_LINT_VERSION) already installed"; \
 	fi
@@ -89,25 +89,28 @@ install-tools:
 
 ## docker-dev: Start development container
 docker-dev:
-	docker-compose up -d dev
-	docker-compose exec dev bash
+	docker compose up -d dev
+	docker compose exec dev bash
 
 ## docker-test: Run tests in container
 docker-test:
-	docker-compose run --rm test
+	docker compose run --rm test
 
 ## docker-lint: Run linter in container
 docker-lint:
-	docker-compose run --rm lint
+	docker compose run --rm lint
 
 ## docker-security: Run security scan in container
 docker-security:
-	docker-compose run --rm security
+	docker compose run --rm security
 
 ## docker-clean: Clean up Docker resources
 docker-clean:
-	docker-compose down -v
+	docker compose down -v
 	docker system prune -f
+
+## ci: Run all CI checks in container
+docker-ci: docker-lint docker-test docker-security
 
 ## check: Run all checks (formatting, linting, testing)
 check: fmt vet lint test-cover
