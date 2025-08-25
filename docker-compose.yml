@@ -10,7 +10,6 @@ services:
       - go-build-cache:/root/.cache/go-build
     working_dir: /workspace
     environment:
-      - GOPATH=/go
       - CGO_ENABLED=0
       - GOOS=linux
       - GOARCH=amd64

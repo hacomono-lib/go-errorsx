@@ -75,7 +75,7 @@ install-tools:
 	@echo "Checking and installing development tools..."
 	@if ! command -v golangci-lint >/dev/null 2>&1 || [ "$$(golangci-lint version 2>/dev/null | sed 's/version /v/' | grep -oE 'v([0-9]+\.[0-9]+\.[0-9]+)')" != "$(GOLANGCI_LINT_VERSION)" ]; then \
 		echo "Installing golangci-lint $(GOLANGCI_LINT_VERSION)..."; \
-		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin $(GOLANGCI_LINT_VERSION); \
+		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $$(go env GOPATH)/bin $(GOLANGCI_LINT_VERSION); \
 	else \
 		echo "golangci-lint $(GOLANGCI_LINT_VERSION) already installed"; \
 	fi
