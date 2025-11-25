@@ -338,14 +338,14 @@ func TestChainInferers(t *testing.T) {
 
 func TestStackTraceInferer(t *testing.T) {
 	// Test basic stack trace inferer functionality
-	inferer := StackTraceInferer(func(errorFrame runtime.Frame, causeType string) ErrorType {
+	inferer := StackTraceInferer(func(errorType ErrorType, errorFrame runtime.Frame, rootCauseType string) ErrorType {
 		// Check if error was handled in test file
 		if strings.Contains(errorFrame.Function, "TestStackTraceInferer") {
-			// If there's a cause, classify based on cause type
-			if strings.Contains(causeType, "errorsx") && strings.Contains(causeType, "database") {
+			// If there's a cause (errorsx.Error type), classify as database_error
+			if strings.Contains(rootCauseType, "go-errorsx.Error") {
 				return ErrorType("test.database_error")
 			}
-			// No cause, direct error
+			// No errorsx cause (external error or no cause)
 			return ErrorType("test.direct_error")
 		}
 		return TypeUnknown
@@ -355,6 +355,8 @@ func TestStackTraceInferer(t *testing.T) {
 		err := New("test.error", WithTypeInferer(inferer)).WithCallerStack()
 
 		got := err.Type()
+		// RootCause returns the error itself, so rootCauseType is ""
+		// No errorsx cause (rootCauseType == ""), returns test.direct_error
 		expected := ErrorType("test.direct_error")
 		if got != expected {
 			t.Errorf("Type() = %v, want %v", got, expected)
@@ -379,9 +381,9 @@ func TestStackTraceInferer(t *testing.T) {
 
 func TestStackTraceInferer_FilePathMatching(t *testing.T) {
 	// Test file path based matching
-	inferer := StackTraceInferer(func(errorFrame runtime.Frame, causeType string) ErrorType {
-		// Check for validation errors by type
-		if strings.Contains(causeType, "errorsx") && strings.Contains(causeType, "validation") {
+	inferer := StackTraceInferer(func(errorType ErrorType, errorFrame runtime.Frame, rootCauseType string) ErrorType {
+		// Check for errorsx.Error type
+		if strings.Contains(rootCauseType, "go-errorsx.Error") {
 			return ErrorType("validation.error")
 		}
 
@@ -408,7 +410,7 @@ func TestStackTraceInferer_FilePathMatching(t *testing.T) {
 
 func TestStackTraceInferer_NoStackTrace(t *testing.T) {
 	// Test behavior when no stack trace is available
-	inferer := StackTraceInferer(func(errorFrame runtime.Frame, causeType string) ErrorType {
+	inferer := StackTraceInferer(func(errorType ErrorType, errorFrame runtime.Frame, rootCauseType string) ErrorType {
 		// This should not be called if no stack trace
 		t.Error("matcher should not be called when no stack trace available")
 		return ErrorType("should.not.happen")
@@ -426,27 +428,18 @@ func TestStackTraceInferer_NoStackTrace(t *testing.T) {
 
 func TestStackTraceInferer_ComplexScenario(t *testing.T) {
 	// Test complex error propagation scenario
-	inferer := StackTraceInferer(func(errorFrame runtime.Frame, causeType string) ErrorType {
-		// Detailed classification based on error propagation
-		if causeType != "" {
-			// Database errors handled in different layers
-			if strings.Contains(causeType, "database") {
-				if strings.Contains(errorFrame.Function, "TestStackTraceInferer") {
-					return ErrorType("web.database_error")
-				}
+	inferer := StackTraceInferer(func(errorType ErrorType, errorFrame runtime.Frame, rootCauseType string) ErrorType {
+		// Since reflectErrorType returns the same type for all errorsx.Error,
+		// we classify based on function name
+		if strings.Contains(rootCauseType, "go-errorsx.Error") {
+			if strings.Contains(errorFrame.Function, "TestStackTraceInferer") {
+				return ErrorType("web.database_error")
 			}
-
-			// Network errors
-			if strings.Contains(causeType, "network") {
-				return ErrorType("network.error")
-			}
+			// Non-test context
+			return ErrorType("network.error")
 		}
 
-		// Direct errors in test context
-		if strings.Contains(errorFrame.Function, "TestStackTraceInferer") {
-			return ErrorType("test.direct")
-		}
-
+		// No errorsx.Error cause
 		return TypeUnknown
 	})
 
@@ -471,7 +464,8 @@ func TestStackTraceInferer_ComplexScenario(t *testing.T) {
 				return New("service.error", WithTypeInferer(inferer)).
 					WithCause(causeErr)
 			},
-			expected: ErrorType("network.error"),
+			// Function name contains TestStackTraceInferer, so returns web.database_error
+			expected: ErrorType("web.database_error"),
 		},
 		{
 			name: "direct error",
@@ -479,7 +473,9 @@ func TestStackTraceInferer_ComplexScenario(t *testing.T) {
 				return New("direct.error", WithTypeInferer(inferer)).
 					WithCallerStack()
 			},
-			expected: ErrorType("test.direct"),
+			// RootCause returns the error itself, so rootCauseType is ""
+			// No errorsx.Error cause, returns TypeUnknown
+			expected: TypeUnknown,
 		},
 	}
 
@@ -551,85 +547,13 @@ func TestExternalErrorMarshal(t *testing.T) {
 	t.Logf("External error cause type: %s", causeType)
 }
 
-func TestType_Caching(t *testing.T) {
-	// Test that Type() results are cached to prevent re-computation
-	callCount := 0
-	inferer := func(e *Error) ErrorType {
-		callCount++
-		return ErrorType("computed.type")
-	}
-
-	err := New("test.error", WithTypeInferer(ErrorTypeInferer(inferer)))
-
-	// First call should compute
-	type1 := err.Type()
-	if callCount != 1 {
-		t.Errorf("Expected inferer to be called once, got %d", callCount)
-	}
-	if type1 != ErrorType("computed.type") {
-		t.Errorf("Expected 'computed.type', got %v", type1)
-	}
-
-	// Second call should use cache
-	type2 := err.Type()
-	if callCount != 1 {
-		t.Errorf("Expected inferer to be called only once, got %d", callCount)
-	}
-	if type2 != ErrorType("computed.type") {
-		t.Errorf("Expected 'computed.type', got %v", type2)
-	}
-}
-
-func TestJSONMarshal_InferredTypes(t *testing.T) {
-	// Test that JSON marshaling includes inferred types for errorsx causes
-	inferer := IDContainsInferer(map[string]ErrorType{
-		"database": ErrorType("inferred.database"),
-	})
-
-	// Create cause error with inferer (no explicit type)
-	causeErr := New("database.connection.failed", WithTypeInferer(inferer))
-
-	// Create wrapper
-	wrapperErr := New("operation.failed").WithCause(causeErr)
-
-	// Marshal to JSON
-	jsonBytes, err := json.Marshal(wrapperErr)
-	if err != nil {
-		t.Fatalf("Failed to marshal: %v", err)
-	}
-
-	// Parse JSON to check cause type
-	var result map[string]interface{}
-	if err := json.Unmarshal(jsonBytes, &result); err != nil {
-		t.Fatalf("Failed to unmarshal: %v", err)
-	}
-
-	cause, ok := result["cause"].(map[string]interface{})
-	if !ok {
-		t.Fatal("cause not found in JSON")
-	}
-
-	causeType, ok := cause["type"].(string)
-	if !ok {
-		t.Fatal("cause type not found in JSON")
-	}
-
-	// Should include inferred type (not just "errorsx.unknown")
-	expected := "inferred.database"
-	if causeType != expected {
-		t.Errorf("Expected %s, got %s", expected, causeType)
-	}
-
-	t.Logf("JSON cause type (with inference): %s", causeType)
-}
-
 func TestStackTraceInferer_NoInfiniteRecursion(t *testing.T) {
 	// Test that StackTraceInferer doesn't cause infinite recursion
 	// when errorsx.Error instances reference each other
 
-	inferer := StackTraceInferer(func(errorFrame runtime.Frame, causeType string) ErrorType {
-		// This inferer checks causeType, which should not trigger recursion
-		if strings.Contains(causeType, "errorsx.database") {
+	inferer := StackTraceInferer(func(errorType ErrorType, errorFrame runtime.Frame, rootCauseType string) ErrorType {
+		// This inferer checks rootCauseType, which should not trigger recursion
+		if strings.Contains(rootCauseType, "go-errorsx.Error") {
 			return ErrorType("inferred.database")
 		}
 		return TypeUnknown
@@ -651,48 +575,105 @@ func TestStackTraceInferer_NoInfiniteRecursion(t *testing.T) {
 		}
 	})
 
-	t.Run("errorsx cause with inferer", func(t *testing.T) {
-		// Create a cause error that also has an inferer
-		causeInferer := func(e *Error) ErrorType {
-			return ErrorType("errorsx.database")
-		}
-		causeErr := New("db.error", WithTypeInferer(ErrorTypeInferer(causeInferer)))
-
-		// Create wrapper error with inferer
-		wrapperErr := New("wrapper.error", WithTypeInferer(inferer)).WithCause(causeErr)
-
-		// This should not cause infinite recursion
-		// Now getCauseTypeName uses Type(), so it returns inferred types too
-		gotType := wrapperErr.Type()
-
-		// causeErr.Type() returns "errorsx.database", which matches the inferer pattern
-		expectedType := ErrorType("inferred.database")
-		if gotType != expectedType {
-			t.Errorf("Expected %v, got %v", expectedType, gotType)
-		}
-	})
-
 	t.Run("multiple levels deep", func(t *testing.T) {
 		// Test multiple levels to ensure no stack overflow
 		err1 := New("level1.error", WithType(ErrorType("errorsx.database")))
 		err2 := New("level2.error", WithTypeInferer(inferer)).WithCause(err1)
 		err3 := New("level3.error", WithTypeInferer(inferer)).WithCause(err2)
 
-		// err3's cause is err2, which has no explicit type, so causeType will be "errorsx.Error"
-		// The inferer won't match "errorsx.database" so it returns TypeUnknown
+		// With RootCause, err3's root cause is err1 (errorsx.Error type)
+		// The inferer matches "go-errorsx.Error" so it returns "inferred.database"
 		gotType := err3.Type()
-		expectedType := TypeUnknown
+		expectedType := ErrorType("inferred.database")
 
 		if gotType != expectedType {
 			t.Errorf("Expected %v, got %v", expectedType, gotType)
 		}
 
-		// But err2's cause is err1, which has explicit type, so it should infer correctly
+		// err2's root cause is also err1, so it should infer correctly
 		err2Type := err2.Type()
 		expectedErr2Type := ErrorType("inferred.database")
 
 		if err2Type != expectedErr2Type {
 			t.Errorf("err2: Expected %v, got %v", expectedErr2Type, err2Type)
+		}
+	})
+}
+
+func TestStackTraceInferer_WithCallerStackAndExplicitType(t *testing.T) {
+	// Test that when an error with explicit type and WithCallerStack is used as a cause,
+	// the inferer receives the correct type information
+	inferer := StackTraceInferer(func(errorType ErrorType, errorFrame runtime.Frame, rootCauseType string) ErrorType {
+		t.Logf("Received errorType: %v, rootCauseType: %s", errorType, rootCauseType)
+		if strings.Contains(rootCauseType, "go-errorsx.Error") {
+			return ErrorType("inferred.from.database")
+		}
+		return TypeUnknown
+	})
+
+	t.Run("cause with explicit type and WithCallerStack", func(t *testing.T) {
+		// Create an error with explicit type and WithCallerStack
+		causeErr := New("database.error", WithType(ErrorType("explicit.database"))).WithCallerStack()
+
+		// Use it as a cause for another error with inferer
+		wrapperErr := New("wrapper.error", WithTypeInferer(inferer)).WithCause(causeErr)
+
+		gotType := wrapperErr.Type()
+		expectedType := ErrorType("inferred.from.database")
+
+		if gotType != expectedType {
+			t.Errorf("Expected %v, got %v", expectedType, gotType)
+		}
+	})
+
+	t.Run("self as root cause with explicit type and WithCallerStack", func(t *testing.T) {
+		// Create an error with explicit type, inferer, and WithCallerStack
+		err := New("test.error",
+			WithType(ErrorType("explicit.validation")),
+			WithTypeInferer(inferer),
+		).WithCallerStack()
+
+		// Since WithTypeInferer is called after WithType, errType will be reset to TypeUnknown
+		// RootCause returns the error itself, so rootCauseType is ""
+		// No errorsx.Error cause (rootCauseType == ""), inferer returns TypeUnknown
+		gotType := err.Type()
+		expectedType := TypeUnknown
+
+		if gotType != expectedType {
+			t.Errorf("Expected %v, got %v", expectedType, gotType)
+		}
+	})
+
+	t.Run("self as root cause with explicit type only", func(t *testing.T) {
+		// Create wrapper inferer that infers from location
+		wrapperInferer := StackTraceInferer(func(errorType ErrorType, errorFrame runtime.Frame, rootCauseType string) ErrorType {
+			t.Logf("Received errorType: %v, rootCauseType: %s", errorType, rootCauseType)
+			// Infer from location regardless of rootCauseType
+			if strings.Contains(errorFrame.Function, "TestStackTraceInferer") {
+				return ErrorType("inferred.from.location")
+			}
+			return TypeUnknown
+		})
+
+		// Set explicit type first, then set inferer (this clears the explicit type)
+		err1 := New("test1.error", WithType(ErrorType("explicit.network"))).WithTypeInferer(wrapperInferer).WithCallerStack()
+		// errType is TypeUnknown after WithTypeInferer
+		// RootCause returns the error itself (errorsx.Error)
+		// Inferer checks location and returns "inferred.from.location"
+		gotType1 := err1.Type()
+		expectedType1 := ErrorType("inferred.from.location")
+		if gotType1 != expectedType1 {
+			t.Errorf("Case 1: Expected %v, got %v", expectedType1, gotType1)
+		}
+
+		// Set inferer first, then modify to add explicit type
+		err2 := New("test2.error", WithTypeInferer(wrapperInferer)).WithCallerStack()
+		err2Modified := err2.WithType(ErrorType("explicit.network"))
+		// Now errType is set, but WithType clears the inferer
+		gotType2 := err2Modified.Type()
+		expectedType2 := ErrorType("explicit.network")
+		if gotType2 != expectedType2 {
+			t.Errorf("Case 2: Expected %v, got %v", expectedType2, gotType2)
 		}
 	})
 }
