@@ -49,6 +49,7 @@ type Error struct {
 	id                string
 	msg               string
 	errType           ErrorType
+	typeInferer       ErrorTypeInferer
 	status            int
 	messageData       any
 	stacks            []StackTrace
@@ -57,6 +58,8 @@ type Error struct {
 	isNotFound        bool
 	isRetryable       bool
 	isStacked         bool
+	computedErrType   ErrorType // Cached computed type result
+	computing         bool      // Flag to prevent infinite recursion
 }
 
 // New creates a new Error with the given id and options.
