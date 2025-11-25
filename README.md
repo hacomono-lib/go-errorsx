@@ -13,6 +13,7 @@ A comprehensive error handling library for Go that provides structured, chainabl
 - **Stack Traces**: Automatic stack trace capture with customizable cleaning
 - **Error Chaining**: Chain errors with cause relationships
 - **Type Classification**: Categorize errors with custom types
+- **Dynamic Error Type Inference**: Runtime error type determination based on stack traces and patterns
 - **HTTP Integration**: Built-in HTTP status code support
 - **Validation Errors**: Specialized support for form validation with field-level errors
 - **JSON Marshaling**: Seamless JSON serialization for API responses
@@ -122,6 +123,42 @@ if errorsx.HasType(adminErr, TypeSecurity) {
 - **Flexible Error Handling**: The same logical error can be handled consistently across different contexts
 - **Clear Separation**: Identity (what happened) vs Classification (how to categorize it)
 - **Reusable Error Definitions**: Error IDs can be reused across different layers or modules
+
+### Dynamic Error Type Inference
+
+The library supports runtime error type determination using inferer functions:
+
+```go
+// Pattern-based inferer for ID matching
+idInferer := errorsx.IDContainsInferer(map[string]errorsx.ErrorType{
+    "auth":     errorsx.ErrorType("security.auth"),
+    "database": errorsx.ErrorType("data.persistence"), 
+})
+
+// Stack trace-based inferer for context-aware classification  
+stackInferer := errorsx.StackTraceInferer(func(errorFrame runtime.Frame, causeFrame *runtime.Frame) errorsx.ErrorType {
+    if causeFrame != nil && strings.Contains(causeFrame.File, "/database/") {
+        if strings.Contains(errorFrame.File, "/handler/") {
+            return errorsx.ErrorType("web.database_error")
+        }
+    }
+    return errorsx.TypeUnknown
+})
+
+// Chain multiple inferers for fallback logic
+combinedInferer := errorsx.ChainInferers(stackInferer, idInferer)
+
+// Apply to errors
+err := errorsx.New("auth.failed", errorsx.WithTypeInferer(combinedInferer))
+
+// Or set globally
+errorsx.SetGlobalTypeInferer(idInferer)
+```
+
+**Key Benefits:**
+- **Unified Error Classification**: Handle errors from different packages consistently
+- **Context-Aware Handling**: Different classification based on error propagation path  
+- **Runtime Flexibility**: Determine error types dynamically based on runtime context
 
 ### Validation Errors
 
@@ -487,9 +524,19 @@ validationErr.WithFieldTranslator(fieldTranslator)
 - `HasType(err error, typ ErrorType) bool`: Check if error has specific type
 - `IsRetryable(err error) bool`: Check if error is retryable
 
+#### Dynamic Error Type Inference Functions
+
+- `IDPatternInferer(patterns map[string]ErrorType) ErrorTypeInferer`: Create inferer using glob patterns
+- `IDContainsInferer(substrings map[string]ErrorType) ErrorTypeInferer`: Create inferer using substring matching
+- `StackTraceInferer(matcher func(runtime.Frame, *runtime.Frame) ErrorType) ErrorTypeInferer`: Create inferer using stack trace analysis
+- `ChainInferers(inferers ...ErrorTypeInferer) ErrorTypeInferer`: Combine multiple inferers
+- `SetGlobalTypeInferer(inferer ErrorTypeInferer)`: Set global inferer for all errors
+- `ClearGlobalTypeInferer()`: Remove global inferer
+
 ### Options
 
 - `WithType(ErrorType)`: Set error type
+- `WithTypeInferer(ErrorTypeInferer)`: Set dynamic type inferer for runtime classification
 - `WithHTTPStatus(int)`: Set HTTP status code
 - `WithCallerStack()`: Capture stack trace from caller
 - `WithCause(error)`: Set underlying cause and automatically capture stack trace

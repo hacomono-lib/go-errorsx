@@ -13,9 +13,47 @@ type Option func(*Error)
 //	err := errorsx.New("input.invalid",
 //		errorsx.WithType(errorsx.TypeValidation),
 //	)
+//
+// Note: Setting an explicit type will clear any inferer, and vice versa.
 func WithType(errType ErrorType) Option {
 	return func(e *Error) {
 		e.errType = errType
+		e.typeInferer = nil // Clear any inferer when explicit type is set
+	}
+}
+
+// WithTypeInferer sets a dynamic type inferer function that determines
+// the error type at runtime based on the error's attributes.
+// This enables flexible error classification based on patterns in
+// the error ID, stack traces, or other error properties.
+//
+// Use built-in helper functions for common patterns, or create custom inferers.
+//
+// Example with pattern matching:
+//
+//	inferer := errorsx.IDPatternInferer(map[string]errorsx.ErrorType{
+//		"auth.*":       TypeAuthentication,
+//		"validation.*": errorsx.TypeValidation,
+//	})
+//	err := errorsx.New("auth.failed", errorsx.WithTypeInferer(inferer))
+//
+// Example with chaining:
+//
+//	inferer := errorsx.ChainInferers(
+//		errorsx.IDContainsInferer(map[string]errorsx.ErrorType{
+//			"auth": TypeAuthentication,
+//		}),
+//		func(e *errorsx.Error) errorsx.ErrorType {
+//			// Custom logic based on stack traces, etc.
+//			return errorsx.TypeUnknown
+//		},
+//	)
+//
+// Note: Setting an inferer will clear any explicit type, and vice versa.
+func WithTypeInferer(inferer ErrorTypeInferer) Option {
+	return func(e *Error) {
+		e.typeInferer = inferer
+		e.errType = TypeUnknown // Reset explicit type when inferer is set
 	}
 }
 

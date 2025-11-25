@@ -49,6 +49,7 @@ type Error struct {
 	id                string
 	msg               string
 	errType           ErrorType
+	typeInferer       ErrorTypeInferer
 	status            int
 	messageData       any
 	stacks            []StackTrace
