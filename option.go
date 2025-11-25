@@ -18,7 +18,9 @@ type Option func(*Error)
 func WithType(errType ErrorType) Option {
 	return func(e *Error) {
 		e.errType = errType
-		e.typeInferer = nil // Clear any inferer when explicit type is set
+		e.typeInferer = nil    // Clear any inferer when explicit type is set
+		e.computedErrType = "" // Clear cache
+		e.computing = false    // Reset computing flag
 	}
 }
 
@@ -54,6 +56,8 @@ func WithTypeInferer(inferer ErrorTypeInferer) Option {
 	return func(e *Error) {
 		e.typeInferer = inferer
 		e.errType = TypeUnknown // Reset explicit type when inferer is set
+		e.computedErrType = ""  // Clear cache
+		e.computing = false     // Reset computing flag
 	}
 }
 

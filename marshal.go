@@ -39,7 +39,7 @@ func (e *Error) MarshalJSON() ([]byte, error) {
 	if e.cause != nil {
 		cause = &jsonCause{
 			Msg:  e.cause.Error(),
-			Type: causeTypeName(e.cause),
+			Type: getCauseTypeName(e.cause),
 		}
 	}
 
@@ -53,14 +53,6 @@ func (e *Error) MarshalJSON() ([]byte, error) {
 		Stacks:      stacks,
 		Cause:       cause,
 	})
-}
-
-// causeTypeName returns the error type as a string for JSON output.
-func causeTypeName(err error) string {
-	if e, ok := err.(*Error); ok {
-		return string(e.Type())
-	}
-	return "undefined"
 }
 
 // trimFunction returns the function name without the full package path.

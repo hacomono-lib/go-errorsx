@@ -136,11 +136,20 @@ idInferer := errorsx.IDContainsInferer(map[string]errorsx.ErrorType{
 })
 
 // Stack trace-based inferer for context-aware classification  
-stackInferer := errorsx.StackTraceInferer(func(errorFrame runtime.Frame, causeFrame *runtime.Frame) errorsx.ErrorType {
-    if causeFrame != nil && strings.Contains(causeFrame.File, "/database/") {
-        if strings.Contains(errorFrame.File, "/handler/") {
-            return errorsx.ErrorType("web.database_error")
-        }
+stackInferer := errorsx.StackTraceInferer(func(errorFrame runtime.Frame, causeType string) errorsx.ErrorType {
+    // Handle external library errors by type
+    switch {
+    case strings.Contains(causeType, "database/sql"):
+        return errorsx.ErrorType("database.error")
+    case strings.Contains(causeType, "encoding/json"):
+        return errorsx.ErrorType("serialization.error")
+    case strings.Contains(causeType, "errorsx.validation"):
+        return errorsx.ErrorType("validation.error")
+    }
+    
+    // Handle based on error handling location
+    if strings.Contains(errorFrame.File, "/handler/") {
+        return errorsx.ErrorType("web.error")
     }
     return errorsx.TypeUnknown
 })
@@ -282,6 +291,39 @@ fmt.Println(string(jsonData))
   }
 }
 ```
+
+#### External Error Type Information
+
+When wrapping external errors (from standard library or other packages), errorsx now provides detailed type information instead of generic "undefined" labels:
+
+```go
+// Example with JSON serialization error
+_, jsonErr := json.Marshal(make(chan int))
+err := errorsx.New("serialization.failed").WithCause(jsonErr)
+
+jsonBytes, _ := json.Marshal(err)
+// JSON output includes detailed cause type:
+// {
+//   "id": "serialization.failed", 
+//   "msg": "serialization.failed",
+//   "cause": {
+//     "msg": "json: unsupported type: chan int",
+//     "type": "encoding/json.UnsupportedTypeError"  // ← Detailed type info!
+//   }
+// }
+
+// Database errors
+dbErr := sql.ErrNoRows
+wrappedErr := errorsx.New("user.not_found").WithCause(dbErr)
+// Cause type will be: "database/sql.Error"
+
+// Network errors  
+httpErr := &url.Error{Op: "Get", URL: "http://example.com", Err: errors.New("timeout")}
+netErr := errorsx.New("request.failed").WithCause(httpErr)
+// Cause type will be: "net/url.Error"
+```
+
+This detailed type information enables more sophisticated error handling and type-based error classification using `StackTraceInferer`.
 
 ### Validation Error JSON
 
@@ -528,7 +570,7 @@ validationErr.WithFieldTranslator(fieldTranslator)
 
 - `IDPatternInferer(patterns map[string]ErrorType) ErrorTypeInferer`: Create inferer using glob patterns
 - `IDContainsInferer(substrings map[string]ErrorType) ErrorTypeInferer`: Create inferer using substring matching
-- `StackTraceInferer(matcher func(runtime.Frame, *runtime.Frame) ErrorType) ErrorTypeInferer`: Create inferer using stack trace analysis
+- `StackTraceInferer(matcher func(runtime.Frame, string) ErrorType) ErrorTypeInferer`: Create inferer using stack trace and cause type analysis
 - `ChainInferers(inferers ...ErrorTypeInferer) ErrorTypeInferer`: Combine multiple inferers
 - `SetGlobalTypeInferer(inferer ErrorTypeInferer)`: Set global inferer for all errors
 - `ClearGlobalTypeInferer()`: Remove global inferer

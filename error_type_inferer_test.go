@@ -1,6 +1,7 @@
 package errorsx
 
 import (
+	"encoding/json"
 	"runtime"
 	"strings"
 	"testing"
@@ -337,11 +338,11 @@ func TestChainInferers(t *testing.T) {
 
 func TestStackTraceInferer(t *testing.T) {
 	// Test basic stack trace inferer functionality
-	inferer := StackTraceInferer(func(errorFrame runtime.Frame, causeFrame *runtime.Frame) ErrorType {
+	inferer := StackTraceInferer(func(errorFrame runtime.Frame, causeType string) ErrorType {
 		// Check if error was handled in test file
 		if strings.Contains(errorFrame.Function, "TestStackTraceInferer") {
-			// If there's a cause, classify based on cause
-			if causeFrame != nil && strings.Contains(causeFrame.Function, "simulateDatabase") {
+			// If there's a cause, classify based on cause type
+			if strings.Contains(causeType, "errorsx") && strings.Contains(causeType, "database") {
 				return ErrorType("test.database_error")
 			}
 			// No cause, direct error
@@ -378,13 +379,10 @@ func TestStackTraceInferer(t *testing.T) {
 
 func TestStackTraceInferer_FilePathMatching(t *testing.T) {
 	// Test file path based matching
-	inferer := StackTraceInferer(func(errorFrame runtime.Frame, causeFrame *runtime.Frame) ErrorType {
-		// Check for specific file patterns
-		if causeFrame != nil {
-			if strings.Contains(causeFrame.File, "_test.go") &&
-				strings.Contains(causeFrame.Function, "simulateValidation") {
-				return ErrorType("validation.error")
-			}
+	inferer := StackTraceInferer(func(errorFrame runtime.Frame, causeType string) ErrorType {
+		// Check for validation errors by type
+		if strings.Contains(causeType, "errorsx") && strings.Contains(causeType, "validation") {
+			return ErrorType("validation.error")
 		}
 
 		// Check error handling location
@@ -410,7 +408,7 @@ func TestStackTraceInferer_FilePathMatching(t *testing.T) {
 
 func TestStackTraceInferer_NoStackTrace(t *testing.T) {
 	// Test behavior when no stack trace is available
-	inferer := StackTraceInferer(func(errorFrame runtime.Frame, causeFrame *runtime.Frame) ErrorType {
+	inferer := StackTraceInferer(func(errorFrame runtime.Frame, causeType string) ErrorType {
 		// This should not be called if no stack trace
 		t.Error("matcher should not be called when no stack trace available")
 		return ErrorType("should.not.happen")
@@ -428,18 +426,18 @@ func TestStackTraceInferer_NoStackTrace(t *testing.T) {
 
 func TestStackTraceInferer_ComplexScenario(t *testing.T) {
 	// Test complex error propagation scenario
-	inferer := StackTraceInferer(func(errorFrame runtime.Frame, causeFrame *runtime.Frame) ErrorType {
+	inferer := StackTraceInferer(func(errorFrame runtime.Frame, causeType string) ErrorType {
 		// Detailed classification based on error propagation
-		if causeFrame != nil {
+		if causeType != "" {
 			// Database errors handled in different layers
-			if strings.Contains(causeFrame.Function, "simulateDatabase") {
+			if strings.Contains(causeType, "database") {
 				if strings.Contains(errorFrame.Function, "TestStackTraceInferer") {
 					return ErrorType("web.database_error")
 				}
 			}
 
 			// Network errors
-			if strings.Contains(causeFrame.Function, "simulateNetwork") {
+			if strings.Contains(causeType, "network") {
 				return ErrorType("network.error")
 			}
 		}
@@ -498,13 +496,203 @@ func TestStackTraceInferer_ComplexScenario(t *testing.T) {
 
 // Helper functions to simulate errors from different components
 func simulateDatabaseError() *Error {
-	return New("database.connection_failed").WithCallerStack()
+	return New("database.connection_failed", WithType(ErrorType("errorsx.database"))).WithCallerStack()
 }
 
 func simulateValidationError() *Error {
-	return New("validation.required_field").WithCallerStack()
+	return New("validation.required_field", WithType(ErrorType("errorsx.validation"))).WithCallerStack()
 }
 
 func simulateNetworkError() *Error {
-	return New("network.timeout").WithCallerStack()
+	return New("network.timeout", WithType(ErrorType("errorsx.network"))).WithCallerStack()
+}
+
+func TestExternalErrorMarshal(t *testing.T) {
+	// Test that external errors get detailed type information in JSON
+	// Create a JSON marshal error using an invalid type (function)
+	//nolint:errchkjson,staticcheck // intentionally creating a marshal error for testing
+	_, jsonErr := json.Marshal(make(chan int))
+
+	// Wrap external error in errorsx.Error
+	err := New("serialization.failed").WithCause(jsonErr)
+
+	// Marshal to JSON
+	jsonBytes, marshalErr := json.Marshal(err)
+	if marshalErr != nil {
+		t.Fatalf("Failed to marshal: %v", marshalErr)
+	}
+
+	// Parse JSON to check cause type
+	var result map[string]interface{}
+	if unmarshalErr := json.Unmarshal(jsonBytes, &result); unmarshalErr != nil {
+		t.Fatalf("Failed to unmarshal: %v", unmarshalErr)
+	}
+
+	cause, ok := result["cause"].(map[string]interface{})
+	if !ok {
+		t.Fatal("cause not found in JSON")
+	}
+
+	causeType, ok := cause["type"].(string)
+	if !ok {
+		t.Fatal("cause type not found in JSON")
+	}
+
+	// Should not be "undefined" anymore
+	if causeType == "undefined" {
+		t.Error("Expected detailed type info, but got 'undefined'")
+	}
+
+	// Should contain package path for external errors
+	if !strings.Contains(causeType, "json") {
+		t.Errorf("Expected JSON-related type, got: %s", causeType)
+	}
+
+	t.Logf("External error cause type: %s", causeType)
+}
+
+func TestType_Caching(t *testing.T) {
+	// Test that Type() results are cached to prevent re-computation
+	callCount := 0
+	inferer := func(e *Error) ErrorType {
+		callCount++
+		return ErrorType("computed.type")
+	}
+
+	err := New("test.error", WithTypeInferer(ErrorTypeInferer(inferer)))
+
+	// First call should compute
+	type1 := err.Type()
+	if callCount != 1 {
+		t.Errorf("Expected inferer to be called once, got %d", callCount)
+	}
+	if type1 != ErrorType("computed.type") {
+		t.Errorf("Expected 'computed.type', got %v", type1)
+	}
+
+	// Second call should use cache
+	type2 := err.Type()
+	if callCount != 1 {
+		t.Errorf("Expected inferer to be called only once, got %d", callCount)
+	}
+	if type2 != ErrorType("computed.type") {
+		t.Errorf("Expected 'computed.type', got %v", type2)
+	}
+}
+
+func TestJSONMarshal_InferredTypes(t *testing.T) {
+	// Test that JSON marshaling includes inferred types for errorsx causes
+	inferer := IDContainsInferer(map[string]ErrorType{
+		"database": ErrorType("inferred.database"),
+	})
+
+	// Create cause error with inferer (no explicit type)
+	causeErr := New("database.connection.failed", WithTypeInferer(inferer))
+
+	// Create wrapper
+	wrapperErr := New("operation.failed").WithCause(causeErr)
+
+	// Marshal to JSON
+	jsonBytes, err := json.Marshal(wrapperErr)
+	if err != nil {
+		t.Fatalf("Failed to marshal: %v", err)
+	}
+
+	// Parse JSON to check cause type
+	var result map[string]interface{}
+	if err := json.Unmarshal(jsonBytes, &result); err != nil {
+		t.Fatalf("Failed to unmarshal: %v", err)
+	}
+
+	cause, ok := result["cause"].(map[string]interface{})
+	if !ok {
+		t.Fatal("cause not found in JSON")
+	}
+
+	causeType, ok := cause["type"].(string)
+	if !ok {
+		t.Fatal("cause type not found in JSON")
+	}
+
+	// Should include inferred type (not just "errorsx.unknown")
+	expected := "inferred.database"
+	if causeType != expected {
+		t.Errorf("Expected %s, got %s", expected, causeType)
+	}
+
+	t.Logf("JSON cause type (with inference): %s", causeType)
+}
+
+func TestStackTraceInferer_NoInfiniteRecursion(t *testing.T) {
+	// Test that StackTraceInferer doesn't cause infinite recursion
+	// when errorsx.Error instances reference each other
+
+	inferer := StackTraceInferer(func(errorFrame runtime.Frame, causeType string) ErrorType {
+		// This inferer checks causeType, which should not trigger recursion
+		if strings.Contains(causeType, "errorsx.database") {
+			return ErrorType("inferred.database")
+		}
+		return TypeUnknown
+	})
+
+	t.Run("errorsx cause with explicit type", func(t *testing.T) {
+		// Create a cause error with explicit type
+		causeErr := New("db.error", WithType(ErrorType("errorsx.database")))
+
+		// Create wrapper error with inferer
+		wrapperErr := New("wrapper.error", WithTypeInferer(inferer)).WithCause(causeErr)
+
+		// This should not cause infinite recursion
+		gotType := wrapperErr.Type()
+		expectedType := ErrorType("inferred.database")
+
+		if gotType != expectedType {
+			t.Errorf("Expected %v, got %v", expectedType, gotType)
+		}
+	})
+
+	t.Run("errorsx cause with inferer", func(t *testing.T) {
+		// Create a cause error that also has an inferer
+		causeInferer := func(e *Error) ErrorType {
+			return ErrorType("errorsx.database")
+		}
+		causeErr := New("db.error", WithTypeInferer(ErrorTypeInferer(causeInferer)))
+
+		// Create wrapper error with inferer
+		wrapperErr := New("wrapper.error", WithTypeInferer(inferer)).WithCause(causeErr)
+
+		// This should not cause infinite recursion
+		// Now getCauseTypeName uses Type(), so it returns inferred types too
+		gotType := wrapperErr.Type()
+
+		// causeErr.Type() returns "errorsx.database", which matches the inferer pattern
+		expectedType := ErrorType("inferred.database")
+		if gotType != expectedType {
+			t.Errorf("Expected %v, got %v", expectedType, gotType)
+		}
+	})
+
+	t.Run("multiple levels deep", func(t *testing.T) {
+		// Test multiple levels to ensure no stack overflow
+		err1 := New("level1.error", WithType(ErrorType("errorsx.database")))
+		err2 := New("level2.error", WithTypeInferer(inferer)).WithCause(err1)
+		err3 := New("level3.error", WithTypeInferer(inferer)).WithCause(err2)
+
+		// err3's cause is err2, which has no explicit type, so causeType will be "errorsx.Error"
+		// The inferer won't match "errorsx.database" so it returns TypeUnknown
+		gotType := err3.Type()
+		expectedType := TypeUnknown
+
+		if gotType != expectedType {
+			t.Errorf("Expected %v, got %v", expectedType, gotType)
+		}
+
+		// But err2's cause is err1, which has explicit type, so it should infer correctly
+		err2Type := err2.Type()
+		expectedErr2Type := ErrorType("inferred.database")
+
+		if err2Type != expectedErr2Type {
+			t.Errorf("err2: Expected %v, got %v", expectedErr2Type, err2Type)
+		}
+	})
 }

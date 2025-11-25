@@ -3,6 +3,7 @@ package errorsx
 import (
 	"errors"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strings"
 	"sync"
@@ -65,8 +66,8 @@ const (
 var (
 	// globalInferer is a single global ErrorTypeInferer that is
 	// applied to errors when no specific inferer is set on the error instance.
-	globalInferer ErrorTypeInferer
-	infererMutex  sync.RWMutex
+	globalInferer ErrorTypeInferer //nolint:gochecknoglobals
+	infererMutex  sync.RWMutex     //nolint:gochecknoglobals
 )
 
 // SetGlobalTypeInferer sets a global ErrorTypeInferer that will be
@@ -151,71 +152,100 @@ func ChainInferers(inferers ...ErrorTypeInferer) ErrorTypeInferer {
 	}
 }
 
+// extractErrorFrame extracts the first frame from an error's stack trace.
+func extractErrorFrame(e *Error) (runtime.Frame, bool) {
+	stacks := e.Stacks()
+	if len(stacks) == 0 || len(stacks[0].Frames) == 0 {
+		return runtime.Frame{}, false
+	}
+
+	frames := runtime.CallersFrames(stacks[0].Frames)
+	if frame, more := frames.Next(); more || frame.PC != 0 {
+		return frame, true
+	}
+
+	return runtime.Frame{}, false
+}
+
+// getCauseTypeName returns the detailed type information for an error.
+// This is similar to the causeTypeName function in marshal.go but reusable.
+// For errorsx.Error, it returns the complete type including inferred types.
+// Infinite recursion is prevented by the caching mechanism in Type().
+func getCauseTypeName(err error) string {
+	if e, ok := err.(*Error); ok {
+		// Now safe to call Type() due to caching mechanism
+		return string(e.Type())
+	}
+
+	// Use reflection to get detailed type information for external errors
+	t := reflect.TypeOf(err)
+	if t == nil {
+		return "undefined"
+	}
+
+	// Handle pointer types
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+
+	// Get package path and type name
+	pkgPath := t.PkgPath()
+	typeName := t.Name()
+
+	if pkgPath == "" || typeName == "" {
+		// Fallback to the full type string
+		return reflect.TypeOf(err).String()
+	}
+
+	return pkgPath + "." + typeName
+}
+
 // StackTraceInferer creates a reusable ErrorTypeInferer that uses stack trace
-// information to dynamically determine error types. The matcher function receives
-// both the error handling location and the original cause location (if available).
+// information and cause type information to dynamically determine error types.
+// The matcher function receives both the error handling location and the detailed
+// type information of the underlying cause error.
 //
 // The errorFrame represents where the current error was handled (e.g., where
-// WithCause or WithCallerStack was called), while causeFrame represents where
-// the underlying error originally occurred.
+// WithCause or WithCallerStack was called), while causeType provides detailed
+// type information of the underlying error.
 //
 // Example:
 //
-//	inferer := StackTraceInferer(func(errorFrame runtime.Frame, causeFrame *runtime.Frame) ErrorType {
-//		// Check if the original error came from database layer
-//		if causeFrame != nil && strings.Contains(causeFrame.File, "/database/") {
-//			// But was handled in web handler
-//			if strings.Contains(errorFrame.File, "/handler/") {
-//				return ErrorType("web.database_error")
-//			}
-//			// Or handled in service layer
-//			if strings.Contains(errorFrame.File, "/service/") {
-//				return ErrorType("service.database_error")
-//			}
+//	inferer := StackTraceInferer(func(errorFrame runtime.Frame, causeType string) ErrorType {
+//		// Handle external library errors by type
+//		switch {
+//		case strings.Contains(causeType, "database/sql"):
+//			return ErrorType("database.error")
+//		case strings.Contains(causeType, "encoding/json"):
+//			return ErrorType("serialization.error")
+//		case strings.Contains(causeType, "errorsx.validation"):
+//			return ErrorType("validation.error")
 //		}
 //
-//		// Direct errors without cause
-//		if causeFrame == nil && strings.Contains(errorFrame.File, "/validation/") {
-//			return ErrorType("direct.validation")
+//		// Handle based on error handling location
+//		if strings.Contains(errorFrame.File, "/handler/") {
+//			return ErrorType("web.error")
+//		}
+//		if strings.Contains(errorFrame.File, "/service/") {
+//			return ErrorType("service.error")
 //		}
 //
 //		return TypeUnknown
 //	})
-func StackTraceInferer(matcher func(errorFrame runtime.Frame, causeFrame *runtime.Frame) ErrorType) ErrorTypeInferer {
+func StackTraceInferer(matcher func(errorFrame runtime.Frame, causeType string) ErrorType) ErrorTypeInferer {
 	return func(e *Error) ErrorType {
-		var errorFrame runtime.Frame
-		var causeFrame *runtime.Frame
-		var hasErrorFrame bool
-
-		// Get the current error's stack trace (where error was handled/wrapped)
-		stacks := e.Stacks()
-		if len(stacks) > 0 && len(stacks[0].Frames) > 0 {
-			frames := runtime.CallersFrames(stacks[0].Frames)
-			if frame, more := frames.Next(); more || frame.PC != 0 {
-				errorFrame = frame
-				hasErrorFrame = true
-			}
+		errorFrame, hasErrorFrame := extractErrorFrame(e)
+		if !hasErrorFrame {
+			return TypeUnknown
 		}
 
-		// Get the cause's stack trace (where original error occurred)
+		// Get cause type information
+		var causeType string
 		if cause := e.Unwrap(); cause != nil {
-			if causeErr, ok := cause.(*Error); ok {
-				causeStacks := causeErr.Stacks()
-				if len(causeStacks) > 0 && len(causeStacks[0].Frames) > 0 {
-					frames := runtime.CallersFrames(causeStacks[0].Frames)
-					if frame, more := frames.Next(); more || frame.PC != 0 {
-						causeFrame = &frame
-					}
-				}
-			}
+			causeType = getCauseTypeName(cause)
 		}
 
-		// Only call matcher if we have at least the error frame
-		if hasErrorFrame {
-			return matcher(errorFrame, causeFrame)
-		}
-
-		return TypeUnknown
+		return matcher(errorFrame, causeType)
 	}
 }
 
@@ -254,7 +284,9 @@ func IDContainsInferer(substrings map[string]ErrorType) ErrorTypeInferer {
 func (e *Error) WithType(typ ErrorType) *Error {
 	clone := *e
 	clone.errType = typ
-	clone.typeInferer = nil // Clear inferer when explicit type is set
+	clone.typeInferer = nil    // Clear inferer when explicit type is set
+	clone.computedErrType = "" // Clear cache
+	clone.computing = false    // Reset computing flag
 
 	return &clone
 }
@@ -282,6 +314,8 @@ func (e *Error) WithTypeInferer(inferer ErrorTypeInferer) *Error {
 	clone := *e
 	clone.typeInferer = inferer
 	clone.errType = TypeUnknown // Reset explicit type when inferer is set
+	clone.computedErrType = ""  // Clear cache
+	clone.computing = false     // Reset computing flag
 
 	return &clone
 }
@@ -291,8 +325,12 @@ func (e *Error) WithTypeInferer(inferer ErrorTypeInferer) *Error {
 // 1. Explicit type (if set) - highest priority
 // 2. Instance-specific inferer (if set)
 // 3. Global inferer (if set)
-// 4. TypeUnknown (default)
-func (e *Error) Type() ErrorType {
+// 4. TypeUnknown (default).
+//
+// Results are cached to prevent infinite recursion when inferers
+// call Type() on related errors.
+// computeErrorType computes the ErrorType for this error without caching.
+func (e *Error) computeErrorType() ErrorType {
 	// 1. Use explicit type if set (and not TypeUnknown) - highest priority
 	if e.errType != TypeUnknown {
 		return e.errType
@@ -305,7 +343,12 @@ func (e *Error) Type() ErrorType {
 		}
 	}
 
-	// 3. Try global inferer
+	// 3. Try global inferer if no result yet
+	return e.tryGlobalInferer()
+}
+
+// tryGlobalInferer attempts to use the global inferer to determine error type.
+func (e *Error) tryGlobalInferer() ErrorType {
 	infererMutex.RLock()
 	inferer := globalInferer
 	infererMutex.RUnlock()
@@ -316,8 +359,41 @@ func (e *Error) Type() ErrorType {
 		}
 	}
 
-	// 4. Default to unknown
+	// Default to unknown
 	return TypeUnknown
+}
+
+// handleRecursion handles the recursion case for Type() method.
+func (e *Error) handleRecursion() ErrorType {
+	if e.errType != TypeUnknown {
+		return e.errType
+	}
+	return TypeUnknown
+}
+
+func (e *Error) Type() ErrorType {
+	// Return cached result if available
+	if e.computedErrType != "" {
+		return e.computedErrType
+	}
+
+	// Prevent infinite recursion by checking if we're already computing
+	if e.computing {
+		return e.handleRecursion()
+	}
+
+	// Mark as computing to prevent recursion
+	e.computing = true
+	defer func() {
+		e.computing = false
+	}()
+
+	// Compute the result
+	result := e.computeErrorType()
+
+	// Cache the result
+	e.computedErrType = result
+	return result
 }
 
 // Type extracts the ErrorType from a generic error.
