@@ -135,22 +135,31 @@ idInferer := errorsx.IDContainsInferer(map[string]errorsx.ErrorType{
     "database": errorsx.ErrorType("data.persistence"), 
 })
 
-// Stack trace-based inferer for context-aware classification  
-stackInferer := errorsx.StackTraceInferer(func(errorFrame runtime.Frame, causeType string) errorsx.ErrorType {
-    // Handle external library errors by type
+// Stack trace-based inferer for context-aware classification
+stackInferer := errorsx.StackTraceInferer(func(errorType errorsx.ErrorType, errorFrame runtime.Frame, rootCauseType string) errorsx.ErrorType {
+    // Use explicit type if available
+    if errorType != errorsx.TypeUnknown {
+        return errorType
+    }
+
+    // Classify based on root cause type
     switch {
-    case strings.Contains(causeType, "database/sql"):
+    case strings.Contains(rootCauseType, "database/sql"):
         return errorsx.ErrorType("database.error")
-    case strings.Contains(causeType, "encoding/json"):
+    case strings.Contains(rootCauseType, "encoding/json"):
         return errorsx.ErrorType("serialization.error")
-    case strings.Contains(causeType, "errorsx.validation"):
-        return errorsx.ErrorType("validation.error")
+    case strings.Contains(rootCauseType, "go-errorsx.Error"):
+        // errorsx.Error as root cause, classify by location
+        if strings.Contains(errorFrame.File, "/handler/") {
+            return errorsx.ErrorType("web.error")
+        }
+    case rootCauseType == "":
+        // No cause, classify by location
+        if strings.Contains(errorFrame.File, "/handler/") {
+            return errorsx.ErrorType("web.direct_error")
+        }
     }
-    
-    // Handle based on error handling location
-    if strings.Contains(errorFrame.File, "/handler/") {
-        return errorsx.ErrorType("web.error")
-    }
+
     return errorsx.TypeUnknown
 })
 
