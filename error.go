@@ -250,3 +250,33 @@ func MessageOr[T any](err error, fallback T) T {
 
 	return fallback
 }
+
+// ReplaceType replaces the error type of any error.
+// If the error is an errorsx.Error, it returns a copy with the new error type.
+// If the error is a standard Go error, it returns the original error unchanged.
+//
+// This function is useful for changing the error type of errorsx.Error instances
+// received from lower layers while preserving other error types as-is.
+//
+// Example:
+//
+//	// Replace type of an errorsx.Error
+//	err := errorsx.New("validation.failed")
+//	typedErr := errorsx.ReplaceType(err, errorsx.TypeValidation)
+//
+//	// Standard Go error remains unchanged
+//	osErr := os.Open("nonexistent.txt") // returns *os.PathError
+//	result := errorsx.ReplaceType(osErr, errorsx.TypeNotFound)
+//	// result == osErr (unchanged)
+func ReplaceType(err error, typ ErrorType) error {
+	if err == nil {
+		return nil
+	}
+
+	var xerr *Error
+	if errors.As(err, &xerr) {
+		return xerr.WithType(typ)
+	}
+
+	return err
+}

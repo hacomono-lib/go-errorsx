@@ -537,6 +537,71 @@ func (s *ErrorSuite) TestReplaceMessage() {
 	}
 }
 
+func (s *ErrorSuite) TestReplaceType() {
+	tests := []struct {
+		name         string
+		err          error
+		typ          errorsx.ErrorType
+		expectChange bool
+		expectedType errorsx.ErrorType
+	}{
+		{
+			name:         "Replace type for errorsx.Error",
+			err:          errorsx.New("validation.failed").WithType(errorsx.TypeUnknown),
+			typ:          errorsx.TypeValidation,
+			expectChange: true,
+			expectedType: errorsx.TypeValidation,
+		},
+		{
+			name:         "Replace type for errorsx.Error with different original type",
+			err:          errorsx.New("auth.failed").WithType(errorsx.TypeInitialization),
+			typ:          errorsx.TypeNotFound,
+			expectChange: true,
+			expectedType: errorsx.TypeNotFound,
+		},
+		{
+			name:         "Standard Go error returns unchanged",
+			err:          fmt.Errorf("standard error"),
+			typ:          errorsx.TypeValidation,
+			expectChange: false,
+			expectedType: errorsx.TypeUnknown, // Not applicable for standard errors
+		},
+		{
+			name:         "Nil error returns nil",
+			err:          nil,
+			typ:          errorsx.TypeValidation,
+			expectChange: false,
+			expectedType: errorsx.TypeUnknown, // Not applicable
+		},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			result := errorsx.ReplaceType(tt.err, tt.typ)
+
+			if tt.err == nil {
+				s.Nil(result)
+				return
+			}
+
+			if tt.expectChange {
+				// Should be an errorsx.Error with the new type
+				xerr, ok := result.(*errorsx.Error)
+				s.Require().True(ok, "Expected result to be *errorsx.Error")
+				s.Equal(tt.expectedType, xerr.Type())
+				// Should preserve original ID and message
+				originalXerr, ok := tt.err.(*errorsx.Error)
+				s.Require().True(ok, "Original error should be *errorsx.Error")
+				s.Equal(originalXerr.ID(), xerr.ID())
+				s.Equal(originalXerr.Error(), xerr.Error())
+			} else {
+				// Should return the original error unchanged
+				s.Equal(tt.err, result)
+			}
+		})
+	}
+}
+
 func (s *ErrorSuite) TestGenericMessageExtraction() {
 	// Test with string message
 	err1 := errorsx.New("test.error").WithMessage("test.message.key")
