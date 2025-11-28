@@ -590,7 +590,8 @@ func (s *ErrorSuite) TestReplaceType() {
 				s.Require().True(ok, "Expected result to be *errorsx.Error")
 				s.Equal(tt.expectedType, xerr.Type())
 				// Should preserve original ID and message
-				originalXerr := tt.err.(*errorsx.Error)
+				originalXerr, ok := tt.err.(*errorsx.Error)
+				s.Require().True(ok, "Original error should be *errorsx.Error")
 				s.Equal(originalXerr.ID(), xerr.ID())
 				s.Equal(originalXerr.Error(), xerr.Error())
 			} else {
