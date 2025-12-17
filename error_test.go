@@ -68,6 +68,39 @@ func (s *ErrorSuite) TestMarshalJSONStructure() {
 	s.Require().NotEmpty(result["stacks"])
 }
 
+func (s *ErrorSuite) TestMarshalJSONWithNestedErrorChain() {
+	// Original error (e.g., database error)
+	originalErr := errors.New("database error: column does not exist")
+
+	// First wrap
+	wrappedErr1 := errorsx.New("error.first").
+		WithReason("first error occurred").
+		WithCause(originalErr)
+
+	// Second wrap
+	wrappedErr2 := errorsx.New("error.second").
+		WithReason("second error occurred").
+		WithCause(wrappedErr1)
+
+	// Marshal to JSON
+	bytes, errMarshal := json.Marshal(wrappedErr2)
+	s.Require().NoError(errMarshal)
+
+	var result map[string]any
+	s.Require().NoError(json.Unmarshal(bytes, &result))
+
+	// Verify that cause field exists
+	s.Require().NotNil(result["cause"], "cause field should exist")
+	cause, ok := result["cause"].(map[string]any)
+	s.Require().True(ok, "cause should be a map")
+
+	// Verify that cause.msg returns the root cause error message
+	// Before the fix, it would return "first error occurred"
+	// After the fix, it returns "database error: column does not exist"
+	s.Require().Equal("database error: column does not exist", cause["msg"],
+		"cause.msg should contain the root cause error message, not the intermediate error message")
+}
+
 func (s *ErrorSuite) TestRootStackTrace() {
 	base := errorsx.New("base.error").WithCallerStack()
 	err := errorsx.New("wrapper.error").WithCause(base)
