@@ -37,9 +37,10 @@ func (e *Error) MarshalJSON() ([]byte, error) {
 
 	var cause *jsonCause
 	if e.cause != nil {
+		rootCause := RootCause(e.cause)
 		cause = &jsonCause{
-			Msg:  e.cause.Error(),
-			Type: reflectErrorType(e.cause),
+			Msg:  rootCause.Error(),
+			Type: reflectErrorType(rootCause),
 		}
 	}
 
