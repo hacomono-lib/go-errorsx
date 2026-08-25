@@ -27,6 +27,10 @@ A comprehensive error handling library for Go that provides structured, chainabl
 go get github.com/hacomono-lib/go-errorsx
 ```
 
+### Requirements
+
+- Go 1.21 or later (tested on 1.21, 1.22, 1.23, 1.24, 1.25, 1.26, 1.27)
+
 ## Quick Start
 
 ```go
